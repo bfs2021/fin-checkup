@@ -1,0 +1,7 @@
+{#
+  관심종목에 담기 (static/watch.js). 스크립트·저장소가 없으면 숨은 채로 둔다.
+  data-watch 는 담을 때의 기준값 — tojson 은 ' 를 ' 로 바꾸므로 작은따옴표 속성이 안전하다.
+#}
+<button type="button" class="fc-button fc-watch-toggle" aria-pressed="false" data-watch='{{ watch_entry | tojson }}' hidden>관심종목에 담기</button>
+<a class="fc-watch-link" href="{{ url('watch/') }}" hidden>관심종목 보기</a>
+<span class="fc-watch-status" role="status" aria-live="polite"></span>

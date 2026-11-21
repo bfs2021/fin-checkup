@@ -1,0 +1,41 @@
+{#
+  관심종목. 목록은 static/watch.js 가 localStorage("fin-checkup:watch")로 채운다 — 이 틀에는 개인 데이터가 없다.
+  사람마다 내용이 달라 색인하지 않는다(noindex → sitemap 에서도 빠진다).
+#}
+{% extends "base.html" %}
+{% block title %}관심종목 · fin-checkup{% endblock %}
+{% block description %}담아 둔 회사의 지금 재무 신호등을 한곳에서 봅니다. 목록은 이 브라우저에만 저장되고 어디에도 보내지 않습니다.{% endblock %}
+{% block head %}
+<meta name="robots" content="noindex">
+{% endblock %}
+{% block main %}
+<article class="fc-watch">
+  <h1>관심종목</h1>
+  <p class="fc-lead">담아 둔 회사의 지금 신호등을 한곳에서 봅니다. 목록은 이 브라우저 저장소에만 저장되고, 서버로 보내지 않습니다. 계정도 필요 없습니다.</p>
+  <noscript><p class="fc-notice">관심종목은 브라우저에서 자바스크립트로 동작합니다. 자바스크립트를 켜면 쓸 수 있습니다.</p></noscript>
+  <p class="fc-notice fc-watch-nostore" hidden>이 브라우저에서는 저장소를 쓸 수 없어 관심종목을 저장할 수 없습니다. 사생활 보호 모드에서는 막혀 있을 수 있습니다.</p>
+
+  <div id="fc-watch-app" hidden>
+    <section class="fc-section" aria-labelledby="watch-list-title">
+      <h2 id="watch-list-title">담은 회사 <small>(이름순)</small></h2>
+      <p class="fc-watch-empty" hidden>아직 담은 회사가 없습니다. 회사 페이지의 "관심종목에 담기" 버튼으로 담을 수 있습니다.</p>
+      <ul class="fc-watch-list"></ul>
+    </section>
+
+    <section class="fc-section" aria-labelledby="watch-io-title">
+      <h2 id="watch-io-title">목록 옮기기</h2>
+      <p class="fc-hint">다른 브라우저·기기로 옮기려면 아래 종목코드 목록을 복사해 그쪽 "가져오기" 칸에 붙여 넣으세요. 한 줄에 종목코드 하나입니다.</p>
+      <label for="fc-watch-export">내보내기</label>
+      <textarea id="fc-watch-export" class="fc-watch-export" rows="4" readonly></textarea>
+      <label for="fc-watch-import">가져오기 <small>(종목코드 6자리 — 줄·쉼표·공백으로 나눠도 됩니다)</small></label>
+      <textarea id="fc-watch-import" class="fc-watch-import" rows="3" spellcheck="false"></textarea>
+      <p><button type="button" class="fc-button fc-watch-import-button">가져오기</button>
+         <button type="button" class="fc-button fc-watch-clear">모두 지우기</button></p>
+      <p class="fc-watch-io-status" role="status" aria-live="polite"></p>
+    </section>
+  </div>
+</article>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url('assets/watch.js') }}" defer></script>
+{% endblock %}

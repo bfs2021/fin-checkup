@@ -39,7 +39,11 @@ def locs(out) -> list[str]:
 
 async def test_sitemap_lists_every_html_page_with_absolute_urls(out):
     urls = locs(out)
-    html_pages = sorted(p.relative_to(out).as_posix() for p in out.rglob("*.html"))
+    html_pages = sorted(
+        p.relative_to(out).as_posix()
+        for p in out.rglob("*.html")
+        if 'name="robots" content="noindex"' not in p.read_text(encoding="utf-8")
+    )
     assert len(urls) == len(html_pages) == len(set(urls))
     assert urls[0] == BASE, "홈이 맨 앞"
     for code in ("005930", "105560", "028300"):
