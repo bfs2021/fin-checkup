@@ -482,13 +482,23 @@ async def cmd_budget(args: argparse.Namespace) -> int:
 async def cmd_site_build(args: argparse.Namespace) -> int:
     """캐시만 읽어 정적 사이트를 만든다. DART 를 부르지 않는다."""
     from fin_checkup.site.build import build_site
+    from fin_checkup.site.buildinfo import read_snapshot_info
     from fin_checkup.site.context import OG_IMAGE_PAGE
     from fin_checkup.site.disclosures import DisclosureFormatError, load_disclosures
+    from fin_checkup.snapshot import SnapshotError
 
     db_path = Path(settings.fin_checkup_db_path)
     if not db_path.exists():
         print(f"캐시 DB 가 없습니다: {db_path}  (FIN_CHECKUP_DB_PATH 로 지정할 수 있습니다)")
         return 1
+
+    snapshot = None
+    if args.snapshot:
+        try:
+            snapshot = read_snapshot_info(args.snapshot)
+        except SnapshotError as exc:
+            print(f"스냅샷 manifest 를 읽지 못했습니다: {exc}")
+            return 1
 
     def progress(done: int, total: int) -> None:
         if done % 200 == 0 or done == total:
@@ -521,6 +531,7 @@ async def cmd_site_build(args: argparse.Namespace) -> int:
                 images=args.images,
                 image_workers=args.image_workers,
                 disclosures=feed,
+                snapshot=snapshot,
             )
         except FileExistsError as exc:
             print(str(exc))
@@ -538,18 +549,25 @@ async def cmd_site_build(args: argparse.Namespace) -> int:
             f"  공유 카드 PNG {n:,}장 · {seconds:.1f}초 · 장당 {per:.0f}ms "
             f"(프로세스 최대 {args.image_workers}개)"
         )
-    if report.image_warning:
-        # GitHub Actions 에선 워크플로 요약에 경고 주석으로 뜬다.
-        prefix = "::warning::" if os.environ.get("GITHUB_ACTIONS") else "경고: "
-        print(f"{prefix}{report.image_warning}")
+    # GitHub Actions 에선 워크플로 요약에 경고 주석으로 뜬다.
+    prefix = "::warning::" if os.environ.get("GITHUB_ACTIONS") else "경고: "
+    for warning in [report.image_warning, *report.warnings]:
+        if warning:
+            print(f"{prefix}{warning}")
     return 0
 
 
 async def cmd_site_check(args: argparse.Namespace) -> int:
     """빌드된 사이트가 넘지 않는 선을 지키는지 (면책·계산식·CSP·외부 스크립트·저장소·인증키)."""
+    from fin_checkup.site.buildinfo import check_freshness
     from fin_checkup.site.guard import check_site
 
     out = Path(args.out_dir)
+    # 오래된 사업연도는 위반이 아니라 사람이 볼 경고 — 종료 코드에 넣지 않는다.
+    stale = check_freshness(out)
+    if stale:
+        prefix = "::warning::" if os.environ.get("GITHUB_ACTIONS") else "경고: "
+        print(f"{prefix}{stale}")
     violations = check_site(out)
     files = sum(1 for p in out.rglob("*") if p.is_file()) if out.is_dir() else 0
     if not violations:
@@ -743,6 +761,10 @@ def main(argv: list[str] | None = None) -> int:
     p_site_build.add_argument(
         "--disclosures", default=None,
         help="`disclosures fetch` 가 쓴 JSON — 회사 페이지·첫 화면 최근 위험 공시와 Atom 피드에 싣는다",
+    )
+    p_site_build.add_argument(
+        "--snapshot", default=None,
+        help="`snapshot import` 한 폴더(manifest.json). 주면 꼬리·build.json 에 스냅샷 날짜를 적는다",
     )
     p_site_build.set_defaults(func=cmd_site_build)
 
