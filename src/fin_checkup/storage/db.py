@@ -175,6 +175,9 @@ _MIGRATION_INTEREST_SOURCE = "migrations.metric_values_interest_source"
 #: 매출채권회전율은 2026-11 까지 합계 태그(TradeAndOtherCurrentReceivables)를 먼저 잡아, 그 태그를
 #: 미수금 줄('기타수취채권' 등)에 붙인 회사는 미수금으로 나눈 값이 대조군에 들어갔다.
 _MIGRATION_RECEIVABLE_SOURCE = "migrations.metric_values_receivable_source"
+#: FCF 는 2026-11 까지 유형자산 취득을 종류별로만 적은 회사의 '기타유형자산의취득' 한 줄을
+#: 설비투자로 썼다(2024 상장사 56곳). 종류별 합으로 고친 값으로 다시 채운다.
+_MIGRATION_CAPEX_SOURCE = "migrations.metric_values_capex_source"
 
 
 class CacheLocked(RuntimeError):
@@ -277,6 +280,9 @@ class Cache:
         if self.get_meta(_MIGRATION_RECEIVABLE_SOURCE) is None:
             self.conn.execute("DELETE FROM metric_values WHERE metric_key = 'receivable_turnover'")
             self.set_meta(_MIGRATION_RECEIVABLE_SOURCE, "done")
+        if self.get_meta(_MIGRATION_CAPEX_SOURCE) is None:
+            self.conn.execute("DELETE FROM metric_values WHERE metric_key = 'fcf'")
+            self.set_meta(_MIGRATION_CAPEX_SOURCE, "done")
 
     def __enter__(self) -> Cache:
         return self

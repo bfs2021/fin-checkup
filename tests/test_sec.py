@@ -7,7 +7,7 @@ import respx
 from fin_checkup.config import Settings
 from fin_checkup.metrics.engine import checkup
 from fin_checkup.metrics.signals import Signal
-from fin_checkup.models import InterestSource, ReceivableSource
+from fin_checkup.models import CapexSource, InterestSource, ReceivableSource
 from fin_checkup.sec.client import SecClient, SecError
 from fin_checkup.sec.normalize import normalize_company_facts
 
@@ -227,6 +227,18 @@ def test_capex_is_positive():
     assert fin is not None
     assert fin.capex == 10949000000
     assert fin.free_cash_flow == 110543000000 - 10949000000
+
+
+@pytest.mark.parametrize("tag,source", [
+    ("PaymentsToAcquirePropertyPlantAndEquipment", CapexSource.PPE),
+    # '생산적 자산' 취득 — 유형자산에 소프트웨어·무형자산이 더해진 태그다.
+    ("PaymentsToAcquireProductiveAssets", CapexSource.PPE_AND_INTANGIBLE),
+])
+def test_capex_source_follows_the_tag(tag, source):
+    data = facts(**{tag: units(entry("2023-09-30", -100.0, start="2022-10-01"))})
+    fin = normalize_company_facts(data, 2023)
+    assert fin.capex == 100.0
+    assert fin.capex_source is source
 
 
 def test_capital_stock_is_left_empty_for_us_filers():

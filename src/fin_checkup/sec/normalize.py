@@ -16,7 +16,14 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Any
 
-from fin_checkup.models import Financials, FsDiv, InterestSource, ReceivableSource, ReportCode
+from fin_checkup.models import (
+    CapexSource,
+    Financials,
+    FsDiv,
+    InterestSource,
+    ReceivableSource,
+    ReportCode,
+)
 
 #: 이 일수 이상이어야 연간 값으로 본다. 분기(약 90일)를 걸러내기 위한 것.
 MIN_ANNUAL_DAYS = 300
@@ -83,6 +90,7 @@ TAG_SPECS: tuple[TagSpec, ...] = (
         ),
         True,
     ),
+    # PaymentsToAcquireProductiveAssets 는 유형자산에 무형자산 등을 더한 '생산적 자산' 취득이다.
     TagSpec(
         "capex",
         (
@@ -116,6 +124,11 @@ INTEREST_PAID_TAG = "InterestPaidNet"
 NET_INTEREST_TAG = "InterestIncomeExpenseNet"
 
 
+#: 설비투자 태그 → 출처.
+CAPEX_TAG_SOURCE = {
+    "PaymentsToAcquirePropertyPlantAndEquipment": CapexSource.PPE,
+    "PaymentsToAcquireProductiveAssets": CapexSource.PPE_AND_INTANGIBLE,
+}
 #: 매출채권 태그 → 출처. ReceivablesNetCurrent 는 매출채권 외 채권까지 묶은 합계다.
 RECEIVABLE_TAG_SOURCE = {
     "AccountsReceivableNetCurrent": ReceivableSource.TRADE,
@@ -224,5 +237,6 @@ def normalize_company_facts(
         currency="USD",
         interest_expense_source=source,
         trade_receivables_source=RECEIVABLE_TAG_SOURCE.get(matched.get("trade_receivables", "")),
+        capex_source=CAPEX_TAG_SOURCE.get(matched.get("capex", "")),
         **values,
     )

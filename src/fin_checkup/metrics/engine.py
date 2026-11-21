@@ -14,7 +14,7 @@ from enum import Enum
 
 from fin_checkup.metrics.sector import Sector
 from fin_checkup.metrics.signals import SEVERITY, Band, Signal
-from fin_checkup.models import Financials, InterestSource, ReceivableSource
+from fin_checkup.models import CapexSource, Financials, InterestSource, ReceivableSource
 
 #: 금액 지표의 unit. 실제 통화(원/달러)는 CheckupResult.currency에서 결정된다.
 #: 여기에 "원"을 박아두면 미국 기업 금액에도 원이 붙는다.
@@ -373,9 +373,31 @@ def _receivable_turnover_override(
     return forced
 
 
+#: 유형자산 취득 합계 줄이 없어 종류별 취득 줄을 더했을 때(2024 상장사 205곳).
+CAPEX_ITEMIZED_NOTE = "유형자산 취득 합계 줄이 없어 종류별 취득(토지·건물·기계장치 등)을 더해 계산."
+#: 유형·무형자산 취득이 한 줄일 때. 설비투자가 무형자산 취득만큼 커서 FCF 는 낮게만 틀린다.
+#: 판정은 그대로 둔다 — 두 줄을 따로 적은 2024 상장사 1,816곳에 무형자산을 더해 보면 FCF 부호가
+#: 바뀌는 곳이 36곳(2.0%)이었고, 무형자산 비중 중앙값은 5.7%였다.
+CAPEX_WITH_INTANGIBLES_NOTE = (
+    "유형·무형자산 취득이 한 줄로 공시돼 무형자산 취득까지 빼서 계산 — 공식보다 낮게 나올 수 있다."
+)
+_CAPEX_NOTES = {
+    CapexSource.PPE_ITEMIZED: CAPEX_ITEMIZED_NOTE,
+    CapexSource.PPE_AND_INTANGIBLE: CAPEX_WITH_INTANGIBLES_NOTE,
+}
+
+
+def _fcf(cur: Financials, _p: Financials | None) -> tuple[float | None, str]:
+    value = cur.free_cash_flow
+    note = _CAPEX_NOTES.get(cur.capex_source, "") if value is not None and cur.capex_source else ""
+    return value, note
+
+
 #: 값의 계산 근거(분모를 어느 계정에서 가져왔나)를 밝히는 비고. 판정을 바꾸지 않는 사실이라
 #: '왜 이 색' 문장에 그대로 덧붙는다(explain.why).
-BASIS_NOTES: tuple[str, ...] = (INTEREST_PAID_NOTE, RECEIVABLE_AGGREGATE_NOTE)
+BASIS_NOTES: tuple[str, ...] = (
+    INTEREST_PAID_NOTE, RECEIVABLE_AGGREGATE_NOTE, CAPEX_ITEMIZED_NOTE, CAPEX_WITH_INTANGIBLES_NOTE,
+)
 
 
 METRIC_DEFS: tuple[MetricDef, ...] = (
@@ -482,7 +504,7 @@ METRIC_DEFS: tuple[MetricDef, ...] = (
         "fcf", "잉여현금흐름 (FCF)", Category.EARNINGS_QUALITY, MONEY,
         "영업으로 번 현금에서 설비투자를 뺀 나머지. 배당·재투자에 쓸 수 있는 여윳돈.",
         "영업활동현금흐름 − 유형자산 취득(CapEx)",
-        lambda c, p: (c.free_cash_flow, ""),
+        _fcf,
         Band(good=0, warn=0),
     ),
     # ── ⑤ 효율성 ────────────────────────────────────────────────

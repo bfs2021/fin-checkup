@@ -7,6 +7,7 @@ from fin_checkup.metrics.engine import checkup
 from fin_checkup.metrics.signals import Signal
 from fin_checkup.models import (
     AccountLine,
+    CapexSource,
     Financials,
     FsDiv,
     InterestSource,
@@ -473,3 +474,23 @@ def test_receivable_turnover_on_pure_line_has_no_note():
         "receivable_turnover",
     )
     assert "매출채권및기타채권" not in m.note
+
+
+# ── 잉여현금흐름: 설비투자의 출처 ────────────────────────────────────
+
+
+@pytest.mark.parametrize("source,piece", [
+    (CapexSource.PPE_ITEMIZED, "종류별"),
+    (CapexSource.PPE_AND_INTANGIBLE, "무형자산"),
+])
+def test_fcf_states_its_capex_basis_and_is_still_judged(source, piece):
+    m = get(checkup(fin(operating_cash_flow=500, capex=200, capex_source=source)), "fcf")
+    assert m.value == 300
+    assert m.signal is Signal.GREEN, "유·무형 합계로 부호가 바뀌는 곳은 2% — 판정은 그대로"
+    assert m.proxy is False
+    assert piece in m.note
+
+
+def test_fcf_on_ppe_total_has_no_basis_note():
+    m = get(checkup(fin(operating_cash_flow=500, capex=200, capex_source=CapexSource.PPE)), "fcf")
+    assert m.note == ""

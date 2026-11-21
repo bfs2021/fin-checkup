@@ -363,6 +363,22 @@ def test_reopening_purges_receivable_turnover_computed_from_other_receivables(tm
         assert c.get_meta(_MIGRATION_RECEIVABLE_SOURCE) == "done"
 
 
+def test_reopening_purges_fcf_computed_from_one_ppe_class(tmp_path):
+    """옛 규칙은 종류별로만 적은 회사의 '기타유형자산의취득' 한 줄을 설비투자로 썼다."""
+    from fin_checkup.storage.db import _MIGRATION_CAPEX_SOURCE
+
+    path = tmp_path / "f.duckdb"
+    with Cache(path) as c:
+        c.conn.execute("DELETE FROM meta WHERE key = ?", [_MIGRATION_CAPEX_SOURCE])
+        c.save_metric_values("A", 2024, {"fcf": 90.0, "roe": 10.0})
+
+    with Cache(path) as c:
+        values = c.peer_metric_values(["A"], 2024)
+        assert "fcf" not in values
+        assert values["roe"] == [10.0]
+        assert c.get_meta(_MIGRATION_CAPEX_SOURCE) == "done"
+
+
 def test_listed_population_excludes_unlisted_markets(cache: Cache):
     """종목코드가 남아 있어도 지금 상장돼 있지 않으면(DART corp_cls 'E' → OTHER) 모집단 밖이다.
 
