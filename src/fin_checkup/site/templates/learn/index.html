@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}처음 오셨나요 · fin-checkup{% endblock %}
+{% block main %}
+<article class="fc-learn">
+  <h1>처음 오셨나요</h1>
+  <p class="fc-lead">fin-checkup 은 회사가 공시한 재무제표로 재무비율을 계산해, 그 값이 어느 구간에 있는지 신호등으로 보여 줍니다.</p>
+
+  <section class="fc-section" aria-labelledby="legend-title">
+    <h2 id="legend-title">신호등 읽는 법</h2>
+    <ul class="fc-legend">
+      {% for s in legend %}
+      <li class="fc-chip sig-{{ s.signal.key }}"><span aria-hidden="true">{{ s.signal.emoji }}</span> <b>{{ s.signal.label }}</b> — {{ s.meaning }}</li>
+      {% endfor %}
+    </ul>
+    <p>색만 보지 않으셔도 됩니다. 모든 신호에는 기호와 글자가 함께 붙고, 지표마다 계산식과 경계값이 적혀 있습니다.</p>
+  </section>
+
+  <section class="fc-section" aria-labelledby="not-title">
+    <h2 id="not-title">이 사이트가 하지 않는 것</h2>
+    <p>사고팔 때를 알려 드리지 않고, 회사를 줄 세우지 않습니다. 신호등은 측정 결과이고, 판단은 읽는 분의 몫입니다.</p>
+  </section>
+
+  <p class="fc-hint">재무제표 처음 읽기, 업종별로 다르게 읽는 법, 용어집은 준비하고 있습니다.</p>
+</article>
+{% endblock %}
