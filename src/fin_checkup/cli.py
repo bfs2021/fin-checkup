@@ -6,6 +6,7 @@
     python -m fin_checkup.cli watch add 005930
     python -m fin_checkup.cli poll --dry-run  # 위험 공시 확인
     python -m fin_checkup.cli site build      # 정적 사이트 (캐시만 읽음)
+    python -m fin_checkup.cli site check site-out  # 빌드 산출물 가드 (면책·CSP·인증키 …)
 """
 
 from __future__ import annotations
@@ -507,6 +508,22 @@ async def cmd_site_build(args: argparse.Namespace) -> int:
     return 0
 
 
+async def cmd_site_check(args: argparse.Namespace) -> int:
+    """빌드된 사이트가 넘지 않는 선을 지키는지 (면책·계산식·CSP·외부 스크립트·저장소·인증키)."""
+    from fin_checkup.site.guard import check_site
+
+    out = Path(args.out_dir)
+    violations = check_site(out)
+    files = sum(1 for p in out.rglob("*") if p.is_file()) if out.is_dir() else 0
+    if not violations:
+        print(f"{out}/ — 파일 {files:,}개 검사, 위반 없음")
+        return 0
+    for violation in violations:
+        print(violation)
+    print(f"\n{out}/ — 파일 {files:,}개 중 위반 {len(violations):,}건 (규칙은 fin_checkup/site/guard.py)")
+    return 1
+
+
 def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(message)s")
 
@@ -615,6 +632,11 @@ def main(argv: list[str] | None = None) -> int:
         help="절대주소가 필요한 곳(canonical·sitemap)에 쓸 사이트 주소. 링크는 상대경로라 무관",
     )
     p_site_build.set_defaults(func=cmd_site_build)
+    p_site_check = site_sub.add_parser(
+        "check", help="빌드된 사이트를 가드 규칙으로 검사 (위반이 있으면 종료 코드 1)"
+    )
+    p_site_check.add_argument("out_dir", help="site build 의 출력 폴더")
+    p_site_check.set_defaults(func=cmd_site_check)
 
     args = parser.parse_args(argv)
     try:
