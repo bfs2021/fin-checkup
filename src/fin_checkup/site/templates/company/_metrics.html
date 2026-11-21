@@ -17,6 +17,7 @@
         <dt>경계값</dt><dd>{{ m.band_text }}</dd>
         {% if m.delta_text %}<dt>작년 대비</dt><dd>{{ m.delta_text }}</dd>{% endif %}
       </dl>
+      {% include "company/_peer_strip.html" %}
       {% if m.note %}
       <p class="fc-note">{% if m.not_applicable %}<b>대신 볼 것</b> {% endif %}{{ m.note }}</p>
       {% endif %}

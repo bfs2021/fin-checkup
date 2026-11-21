@@ -24,8 +24,9 @@ from html import escape
 from markupsafe import Markup
 
 from fin_checkup.format import chart_scale, format_metric, format_money
-from fin_checkup.metrics.engine import MONEY, checkup
-from fin_checkup.metrics.signals import Signal
+from fin_checkup.metrics.engine import MONEY, Metric, checkup
+from fin_checkup.metrics.peers import PeerStat
+from fin_checkup.metrics.signals import Band, Signal
 from fin_checkup.models import Financials
 from fin_checkup.service import Checkup
 
@@ -315,3 +316,168 @@ def trend_panels(data: Checkup, years: int = 5) -> list[TrendPanel]:
 def years_of(panels: Sequence[TrendPanel]) -> list[int]:
     """표 머리에 쓸 연도. 모든 패널이 같은 연도 칸을 쓴다."""
     return [p.year for p in panels[0].series.points] if panels else []
+
+
+# ── 동종업계 분포 위 이 회사의 위치 ──────────────────────────────
+
+#: viewBox 크기. 지표 카드 안에 들어가므로 낮고 넓게.
+STRIP_W, STRIP_H = 320, 62
+_STRIP_X0, _STRIP_X1 = 10, 310
+_DIST_Y = 24  # 상자·수염·표식의 가운데 줄
+_BAND_Y = 42  # 경계값 띠
+_LABEL_GAP = 36  # 경계값 글자 사이 최소 간격(px). 더 가까우면 뒤의 것을 뺀다 — 경계값 문장에 이미 있다.
+
+
+def _value_text(value: float, unit: str, currency: str) -> str:
+    if unit == MONEY:
+        return format_money(value, currency)
+    if value == int(value) or abs(value) >= 100:
+        return f"{value:,.0f}{unit}"
+    return f"{value:,.1f}{unit}"
+
+
+def _band_segments(band: Band, lo: float, hi: float) -> list[tuple[float, float, Signal]]:
+    """경계값이 나누는 구간을 [lo, hi] 안으로 자른 것. 폭이 0 인 구간(good == warn)은 뺀다."""
+    if band.higher_is_better:
+        raw = [
+            (-math.inf, band.warn, Signal.RED),
+            (band.warn, band.good, Signal.YELLOW),
+            (band.good, math.inf, Signal.GREEN),
+        ]
+    else:
+        raw = [
+            (-math.inf, band.good, Signal.GREEN),
+            (band.good, band.warn, Signal.YELLOW),
+            (band.warn, math.inf, Signal.RED),
+        ]
+    out = []
+    for a, b, signal in raw:
+        a, b = max(a, lo), min(b, hi)
+        if b > a:
+            out.append((a, b, signal))
+    return out
+
+
+@dataclass(frozen=True)
+class PeerStrip:
+    svg: Markup
+    #: "동종업계 34개사 분포" — 순위가 아니라 분포라는 걸 이름부터 말한다.
+    title: str
+    #: "가운데 50% 2.1% ~ 8.4% · 중앙값 4.3%"
+    spread_text: str
+    value_text: str
+    #: 경계값 띠를 그렸는지 (⚪ 측정값 지표는 경계값이 없다).
+    has_band: bool
+
+
+def peer_strip(metric: Metric, stat: PeerStat | None, currency: str, chart_id: str) -> PeerStrip | None:
+    """한 지표의 대조군 분포(10·25·50·75·90 백분위수) 위에 이 회사 값을 찍은 띠.
+
+    ⊘·⚫ 이거나 값·분포가 없으면 None — 판정하지 않는 지표를 분포 위에 올리면 판정처럼 읽힌다.
+    순위·백분위 숫자는 쓰지 않는다. 경계값 띠는 `metric.band`(엔진이 실제로 쓴 것) 그대로.
+    """
+    if (
+        stat is None
+        or metric.value is None
+        or metric.signal in (Signal.NOT_APPLICABLE, Signal.UNKNOWN)
+        or None in (stat.p10, stat.q1, stat.q3, stat.p90)
+    ):
+        return None
+    p10, q1, q3, p90, median = stat.p10, stat.q1, stat.q3, stat.p90, stat.median
+    band = metric.band
+    unit = metric.unit
+    value = metric.value
+
+    anchors = [p10, p90] + ([band.good, band.warn] if band else [])
+    lo, hi = min(anchors), max(anchors)
+    span = hi - lo or max(abs(hi), 1.0)
+    # 동떨어진 값 하나가 분포를 한 점으로 짜부라뜨리지 않게, 너무 먼 값은 끝에 붙이고 화살표로 표시한다.
+    if lo - span * 0.6 <= value <= hi + span * 0.6:
+        lo, hi = min(lo, value), max(hi, value)
+    pad = (hi - lo or 1.0) * 0.06
+    lo, hi = lo - pad, hi + pad
+
+    def x(v: float) -> float:
+        v = min(max(v, lo), hi)
+        return _STRIP_X0 + (v - lo) / (hi - lo) * (_STRIP_X1 - _STRIP_X0)
+
+    title = f"{stat.scope.label} {stat.sample_size}개사 분포"
+    spread = (
+        f"가운데 50% {_value_text(q1, unit, currency)} ~ {_value_text(q3, unit, currency)}"
+        f" · 중앙값 {_value_text(median, unit, currency)}"
+    )
+    mine = f"이 회사 {_value_text(value, unit, currency)}"
+    cid = _esc(chart_id)
+    outer = f"{_value_text(p10, unit, currency)} ~ {_value_text(p90, unit, currency)}"
+    desc = f"{title}. 10~90% 구간 {outer}, {spread}. {mine}."
+
+    parts = [
+        f'<svg class="fc-ch fc-ch-peer" viewBox="0 0 {STRIP_W} {STRIP_H}" role="img" '
+        f'aria-labelledby="{cid}-t {cid}-d" xmlns="http://www.w3.org/2000/svg">',
+        f'<title id="{cid}-t">{_esc(metric.label)} — {_esc(title)}</title>',
+        f'<desc id="{cid}-d">{_esc(desc)}</desc>',
+    ]
+    if band is not None:
+        parts.append('<g class="fc-ch-bands">')
+        segments = _band_segments(band, lo, hi)
+        for i, (a, b, signal) in enumerate(segments):
+            x0 = x(a) + (1 if i else 0)
+            x1 = x(b) - (1 if i < len(segments) - 1 else 0)
+            parts.append(
+                f'<rect class="fc-ch-band sig-{signal.value}" x="{x0:.1f}" y="{_BAND_Y}" '
+                f'width="{max(x1 - x0, 0):.1f}" height="4" rx="2">'
+                f"<title>{_esc(signal.emoji)} {_esc(signal.label)} 구간</title></rect>"
+            )
+        last = -math.inf
+        for edge in sorted({band.warn, band.good}):
+            ex = x(edge)
+            if not (lo < edge < hi) or ex - last < _LABEL_GAP:
+                continue
+            last = ex
+            parts.append(
+                f'<line class="fc-ch-edge" x1="{ex:.1f}" x2="{ex:.1f}" '
+                f'y1="{_BAND_Y - 3}" y2="{_BAND_Y + 7}"/>'
+            )
+            parts.append(
+                f'<text class="fc-ch-tick" x="{ex:.1f}" y="{STRIP_H - 2}" text-anchor="middle">'
+                f"{_esc(_value_text(edge, unit, currency))}</text>"
+            )
+        parts.append("</g>")
+
+    parts.append(f'<g class="fc-ch-dist"><title>{_esc(title)}: {_esc(spread)}</title>')
+    parts.append(
+        f'<line class="fc-ch-whisker" x1="{x(p10):.1f}" x2="{x(p90):.1f}" y1="{_DIST_Y}" y2="{_DIST_Y}"/>'
+    )
+    parts.append(
+        f'<rect class="fc-ch-box" x="{x(q1):.1f}" y="{_DIST_Y - 7}" '
+        f'width="{max(x(q3) - x(q1), 1.5):.1f}" height="14" rx="3"/>'
+    )
+    parts.append(
+        f'<line class="fc-ch-median" x1="{x(median):.1f}" x2="{x(median):.1f}" '
+        f'y1="{_DIST_Y - 9}" y2="{_DIST_Y + 9}"/>'
+    )
+    parts.append("</g>")
+
+    mx = x(value)
+    parts.append(f'<g class="fc-ch-mine"><title>{_esc(mine)}</title>')
+    if value < lo:
+        parts.append(f'<path class="fc-ch-marker" d="M{mx - 1:.1f},{_DIST_Y}l9,-6v12z"/>')
+    elif value > hi:
+        parts.append(f'<path class="fc-ch-marker" d="M{mx + 1:.1f},{_DIST_Y}l-9,-6v12z"/>')
+    else:
+        parts.append(f'<circle class="fc-ch-marker" cx="{mx:.1f}" cy="{_DIST_Y}" r="5"/>')
+    parts.append("</g></svg>")
+    return PeerStrip(Markup("".join(parts)), title, spread, mine, band is not None)
+
+
+def peer_strips(data: Checkup) -> dict[str, PeerStrip]:
+    """지표 key → 분포 띠. ⊘·⚫·대조군 없음은 빠진다."""
+    code = data.corp.stock_code or data.corp.corp_code
+    strips: dict[str, PeerStrip] = {}
+    for metric in data.result.metrics:
+        strip = peer_strip(
+            metric, data.peers.get(metric.key), data.result.currency, f"peer-{code}-{metric.key}"
+        )
+        if strip is not None:
+            strips[metric.key] = strip
+    return strips

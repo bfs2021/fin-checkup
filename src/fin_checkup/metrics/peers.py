@@ -45,6 +45,11 @@ class PeerStat:
     #: 표시 단위. 금액 지표를 그대로 찍으면 -846,681,792.00 같은 게 나온다.
     unit: str = ""
     currency: str = "KRW"
+    #: 분포 모양 — 10·25·75·90 백분위수 (inclusive 방식). 분포 그림(`site/charts.py`)이 쓴다.
+    p10: float | None = None
+    q1: float | None = None
+    q3: float | None = None
+    p90: float | None = None
 
     @property
     def median_text(self) -> str:
@@ -157,6 +162,11 @@ def peer_stats(
 
     higher_is_better = metric.band.higher_is_better if metric.band is not None else True
     median = statistics.median(values)
+    q1 = q3 = p10 = p90 = None
+    if len(values) >= 2:
+        q1, _, q3 = statistics.quantiles(values, n=4, method="inclusive")
+        deciles = statistics.quantiles(values, n=10, method="inclusive")
+        p10, p90 = deciles[0], deciles[-1]
 
     percentile: float | None = None
     if metric.value is not None:
@@ -175,4 +185,8 @@ def peer_stats(
         unit=metric.unit,
         currency=currency,
         scope=scope,
+        p10=p10,
+        q1=q1,
+        q3=q3,
+        p90=p90,
     )
