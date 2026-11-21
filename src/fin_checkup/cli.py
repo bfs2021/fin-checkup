@@ -400,6 +400,28 @@ async def cmd_backfill(args: argparse.Namespace) -> int:
     return 0
 
 
+async def cmd_snapshot(args: argparse.Namespace) -> int:
+    """공개 스냅샷 export/import. 허용목록 테이블만 다룬다 (snapshot.py)."""
+    from fin_checkup.snapshot import SnapshotError, export_snapshot, import_snapshot
+
+    try:
+        if args.snapshot_action == "export":
+            db = args.db or settings.fin_checkup_db_path
+            manifest = export_snapshot(
+                db, args.out, secrets=[settings.dart_api_key, settings.telegram_bot_token]
+            )
+            print(f"스냅샷을 {args.out} 에 썼습니다 (빌드 {manifest['built_on']} KST).")
+        else:
+            manifest = import_snapshot(args.src, args.db)
+            print(f"{args.src} 로 {args.db} 를 만들었습니다 (스냅샷 빌드 {manifest['built_on']}).")
+    except SnapshotError as exc:
+        print(f"스냅샷 오류: {exc}")
+        return 1
+    for table, info in manifest["tables"].items():
+        print(f"  {table:<16} {info['rows']:>10,}행")
+    return 0
+
+
 async def cmd_budget(args: argparse.Namespace) -> int:
     """오늘 DART를 몇 번 호출했는지."""
     with Cache(settings.fin_checkup_db_path) as cache:
@@ -470,6 +492,17 @@ def main(argv: list[str] | None = None) -> int:
     p_backfill.add_argument("--year", type=int, default=default_fiscal_year(), help="기준 사업연도")
     p_backfill.add_argument("--years", type=int, default=2, help="거슬러 올라갈 연수")
     p_backfill.set_defaults(func=cmd_backfill)
+
+    p_snapshot = sub.add_parser("snapshot", help="공개 스냅샷 export/import (허용목록 테이블만)")
+    snapshot_sub = p_snapshot.add_subparsers(dest="snapshot_action", required=True)
+    p_export = snapshot_sub.add_parser("export", help="캐시 → parquet + manifest.json")
+    p_export.add_argument("--out", required=True, help="빈 출력 폴더")
+    p_export.add_argument("--db", default="", help="원본 캐시 (기본: FIN_CHECKUP_DB_PATH)")
+    p_export.set_defaults(func=cmd_snapshot)
+    p_import = snapshot_sub.add_parser("import", help="스냅샷 폴더 → 새 캐시 DB")
+    p_import.add_argument("src", help="manifest.json 이 있는 폴더")
+    p_import.add_argument("--db", required=True, help="만들 캐시 파일 (이미 있으면 거부)")
+    p_import.set_defaults(func=cmd_snapshot)
 
     p_account = sub.add_parser("account", help="운영자용 계정 관리")
     account_sub = p_account.add_subparsers(dest="account_action", required=True)
