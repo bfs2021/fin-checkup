@@ -93,7 +93,10 @@ def test_watch_script_stays_in_the_browser():
     for banned in ("document.cookie", "sendBeacon", "XMLHttpRequest", "http://", "https://", "streak"):
         assert banned not in js, banned
     # fetch 는 같은 사이트의 정적 JSON 만.
-    assert re.findall(r"fetch\(([^)]*)\)", js) == ['root + "api/c/" + code + ".json"']
+    assert sorted(re.findall(r"fetch\(([^)]*)\)", js)) == [
+        'root + "api/c/" + code + ".json"',
+        'root + "data/disclosures.json"',
+    ]
 
 
 # ── 순수 로직 (node) ──────────────────────────────────────────────
@@ -114,8 +117,9 @@ SAM = {
     "year": 2024,
     "saved": "2026-11-21",
     "signals": {"debt_ratio": "yellow"},
+    "seen": [],
 }
-KB = {"code": "105560", "name": "KB금융", "year": 2024, "saved": "2026-11-20", "signals": {}}
+KB = {"code": "105560", "name": "KB금융", "year": 2024, "saved": "2026-11-20", "signals": {}, "seen": []}
 
 
 def test_add_remove_and_round_trip():
@@ -148,7 +152,14 @@ def test_export_and_import_codes():
     assert node("w.parseCodes('005930, 000660;005930\\n abc 12345 0126z0')") == ["005930", "000660", "0126Z0"]
     imported = node(f"w.importCodes(w.add(w.parse(''), {json.dumps(SAM)}), ['005930', '000660']).items")
     assert imported[0] == SAM, "이미 담긴 회사의 기준은 덮지 않는다"
-    assert imported[1] == {"code": "000660", "name": "000660", "year": None, "saved": None, "signals": None}
+    assert imported[1] == {
+        "code": "000660",
+        "name": "000660",
+        "year": None,
+        "saved": None,
+        "signals": None,
+        "seen": [],
+    }
 
 
 def test_kst_today_is_not_utc():
@@ -160,7 +171,7 @@ async def test_snapshot_of_the_company_json_matches_the_page_toggle(out):
     company = json.loads(read(out, "api/c/005930.json"))
     snap = node(f"w.snapshotOf({json.dumps(company)}, '2026-11-21')")
     entry = toggle_entry(read(out, "c/005930/index.html"))
-    assert snap == {**entry, "saved": "2026-11-21"}
+    assert snap == {**entry, "saved": "2026-11-21", "seen": []}
 
 
 # ── 브라우저 스모크 ───────────────────────────────────────────────
