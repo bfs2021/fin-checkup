@@ -26,6 +26,7 @@ from fin_checkup.site.registry import Output
 from fin_checkup.site.season import SeasonView, season_view
 
 if TYPE_CHECKING:
+    from fin_checkup.site.buildinfo import SnapshotInfo
     from fin_checkup.site.disclosures import DisclosureFeed
 
 
@@ -102,6 +103,8 @@ class Site:
     #: `cli disclosures fetch` 가 쓴 최근 위험 공시 (`site/disclosures.py` 가 검증). 없으면 None —
     #: 회사 페이지·첫 화면 공시 섹션은 생기지 않고, 피드는 공시 없이 만든다.
     disclosures: DisclosureFeed | None = None
+    #: 스냅샷 manifest (`site build --snapshot`). 꼬리의 데이터 기준 줄에 날짜를 적는다.
+    snapshot: SnapshotInfo | None = None
 
     def __post_init__(self) -> None:
         if not self.base_url.endswith("/"):

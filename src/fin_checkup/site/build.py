@@ -15,12 +15,21 @@ import shutil
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 
-from fin_checkup.clock import kst_today
+from fin_checkup.clock import kst_now, kst_today
 from fin_checkup.config import Settings
 from fin_checkup.service import CheckupService
+from fin_checkup.site.buildinfo import (
+    BUILD_JSON,
+    SnapshotInfo,
+    build_json,
+    data_years,
+    dump,
+    freshness_warning,
+    git_sha,
+)
 from fin_checkup.site.context import OG_IMAGE_PAGE, CompanyEntry, Site, safe_output_path
 from fin_checkup.site.disclosures import DisclosureFeed, as_feed
 from fin_checkup.site.images.fonts import INSTALL_HINT, FontSet, resolve_fonts
@@ -50,6 +59,8 @@ class BuildReport:
     pages: dict[str, tuple[int, float]] = field(default_factory=dict)
     #: PNG 를 못 만든 이유 (글꼴 없음). 만들었거나 --no-images 면 빈 문자열.
     image_warning: str = ""
+    #: 빌드는 됐지만 사람이 봐야 할 것 (오래된 사업연도 등 — buildinfo.freshness_warning).
+    warnings: list[str] = field(default_factory=list)
 
     @property
     def per_company_ms(self) -> float:
@@ -138,10 +149,13 @@ async def build_site(
     image_workers: int = 1,
     fonts: FontSet | None = None,
     disclosures: DisclosureFeed | dict | None = None,
+    built_at: datetime | None = None,
+    snapshot: SnapshotInfo | None = None,
 ) -> BuildReport:
     """images=False 거나 한국어 글꼴이 없으면 PNG 페이지(`OG_IMAGE_PAGE`)를 이번 빌드에서 뺀다 — 두부(□)
     그림을 내느니 없는 편이 낫고, 그림이 없으면 og:image 도 내지 않는다."""
     started = time.perf_counter()
+    built_at = built_at or kst_now()
     entries, skipped = await collect_companies(cache, year, limit, progress)
     loaded = time.perf_counter()
 
@@ -161,6 +175,7 @@ async def build_site(
         fonts=image_fonts,
         image_workers=image_workers,
         disclosures=as_feed(disclosures),
+        snapshot=snapshot,
     )
     _prepare_out(out)
     files = 0
@@ -179,6 +194,11 @@ async def build_site(
     for output in crawl_outputs(site, indexable):
         _write(out, output)
         files += 1
+    # build.json 은 맨 마지막 — 자기 자신까지 센 개수를 싣는다.
+    files += 1
+    counts = {"companies": len(entries), "skipped": skipped, "pages": pages_written(out), "files": files}
+    _write(out, Output(BUILD_JSON, dump(build_json(site, built_at, git_sha(), counts))))
+    stale = freshness_warning(max(data_years(entries), default=None), site.built_on)
 
     return BuildReport(
         companies=len(entries),
@@ -188,4 +208,9 @@ async def build_site(
         render_seconds=time.perf_counter() - loaded,
         pages=timings,
         image_warning=image_warning,
+        warnings=[stale] if stale else [],
     )
+
+
+def pages_written(out: Path) -> int:
+    return sum(1 for _ in out.rglob("*.html"))

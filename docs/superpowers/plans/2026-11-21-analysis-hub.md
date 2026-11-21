@@ -80,7 +80,7 @@
 | D2 | 최근 위험 공시 수집 스크립트 (Actions, secret) | ☑ |
 | D3 | 회사 페이지 "최근 위험 공시" · 첫 화면 시장 전체 공시 (`site build --disclosures` → `site/disclosures.DisclosureFeed`, 피드(R4)와 같은 검증·기준 공유) | ☑ |
 | D4 | 스케줄 재빌드 워크플로 | ☐ |
-| D5 | 빌드 메타·신선도 표시 | ☐ |
+| D5 | 빌드 메타·신선도 표시 (`/build.json` · 꼬리 줄 · `site/buildinfo.py`, `site build --snapshot`) | ☑ |
 | D6 | 빌드 병렬화·증분 | ☐ |
 | D7 | 2022·2021 채우기 (추이 5년) | ☐ |
 

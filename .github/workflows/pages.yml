@@ -133,7 +133,8 @@ jobs:
           YEAR: ${{ inputs.year }}
           DISCLOSURES_OK: ${{ steps.disclosures.outcome == 'success' }}
         run: |
-          args=(--out site-out --base-url "$SITE_URL")
+          # --snapshot: 꼬리의 데이터 기준 줄과 /build.json 에 스냅샷 manifest 날짜를 적는다.
+          args=(--out site-out --base-url "$SITE_URL" --snapshot _snapshot/files)
           if [ -n "$YEAR" ]; then args+=(--year "$YEAR"); fi
           # 공시 단계가 성공해 파일을 남겼을 때만 넘긴다. 빌더가 회사 페이지·첫 화면 공시 섹션,
           # 회사별·시장 전체 Atom 피드(feeds/)의 공시 항목, /data/disclosures.json 을 만든다.
