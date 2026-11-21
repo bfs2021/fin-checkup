@@ -15,6 +15,9 @@
 - `handler`     인라인 이벤트 핸들러(`onclick=` …)·`javascript:` 주소 없음.
 - `storage`     쿠키·sessionStorage·indexedDB 없음. localStorage 는 `fin-checkup:` 키만.
 - `secret`      DART 인증키처럼 생긴 40자리 16진수·`crtfc_key` 가 어떤 파일에도 없다.
+- `a11y`        `<html lang="ko">` · 본문 건너뛰기 링크(`#main`)
+                · 랜드마크(머리 header·nav·main 하나·꼬리 footer)
+                · 신호(`sig-*`)는 색만으로 말하지 않는다 — 기호(🟢…)나 글자(정상…)가 함께 있다.
 - `banned`      추천·매매 권유·재촉 표현(`explain.banned`)이 빌드된 HTML·템플릿·해설 데이터에 없다.
                 예외는 `ALLOWED_SENTENCES` 의 문장 그대로와, 검색 인덱스의 회사 이름(데이터)뿐.
 """
@@ -32,9 +35,14 @@ from pathlib import Path
 
 from fin_checkup.disclaimer import DISCLAIMER
 from fin_checkup.explain import banned
+from fin_checkup.metrics.signals import Signal
 
 #: 판정한 신호. 이 신호의 지표는 경계값을 반드시 보여야 한다 — 왜 이 색인지 감추지 않는다.
 JUDGED_SIGNALS = frozenset({"sig-green", "sig-yellow", "sig-red"})
+#: 신호 클래스 → 함께 있어야 하는 기호·글자 (둘 중 하나).
+SIGNAL_TEXT = {f"sig-{s.value}": (s.emoji, s.label) for s in Signal}
+#: 이 안의 header·footer 는 페이지 머리·꼬리(랜드마크)가 아니다.
+_SECTIONING = frozenset({"article", "aside", "main", "nav", "section"})
 #: 브라우저 저장소에 쓸 수 있는 키의 접두사 (관심종목 등, 이 기기 안에서만).
 STORAGE_PREFIX = "fin-checkup:"
 #: 실행되지 않는 데이터 블록. CSP 와 무관하게 허용한다.
@@ -110,6 +118,15 @@ class _PageScan(HTMLParser):
         self._pending_dt = ""
         self._script_inline = False
         self._script_text: list[str] = []
+        self.lang = ""
+        self.skip_link = False
+        self.mains: list[str] = []
+        self.navs = 0
+        self.banners = 0
+        self.contentinfos = 0
+        #: (신호 클래스, 그 요소의 글자) — 닫힐 때 모인다.
+        self.signals: list[tuple[str, str]] = []
+        self._open_signals: list[tuple[str, int, list[str]]] = []
 
     # -- 태그 ------------------------------------------------------------
 
@@ -138,10 +155,26 @@ class _PageScan(HTMLParser):
             self._script_inline = not a.get("src") and a.get("type", "").lower() not in DATA_SCRIPT_TYPES
             self._script_text = []
 
+        if tag == "html":
+            self.lang = a.get("lang", "")
+        if tag == "a" and a.get("href") == "#main":
+            self.skip_link = True
+        if tag == "main":
+            self.mains.append(a.get("id", ""))
+        if tag == "nav":
+            self.navs += 1
+        if tag in {"header", "footer"} and not _SECTIONING & set(self.stack):
+            if tag == "header":
+                self.banners += 1
+            else:
+                self.contentinfos += 1
+
         if tag in _VOID:
             return
         self.stack.append(tag)
         classes = set(a.get("class", "").split())
+        for cls in classes & SIGNAL_TEXT.keys():
+            self._open_signals.append((cls, len(self.stack), []))
         if "fc-metric" in classes:
             card = _Card(classes=classes, ident=a.get("id", ""), depth=len(self.stack))
             self._open_cards.append(card)
@@ -172,6 +205,9 @@ class _PageScan(HTMLParser):
             closed = self.stack.pop()
             if self._open_cards and self._open_cards[-1].depth == len(self.stack) + 1:
                 self.cards.append(self._open_cards.pop())
+            while self._open_signals and self._open_signals[-1][1] == len(self.stack) + 1:
+                cls, _depth, text = self._open_signals.pop()
+                self.signals.append((cls, "".join(text)))
             if closed == tag:
                 break
 
@@ -182,6 +218,8 @@ class _PageScan(HTMLParser):
             self._dt.append(data)
         if self._dd is not None:
             self._dd.append(data)
+        for _cls, _depth, text in self._open_signals:
+            text.append(data)
 
 
 # ----------------------------------------------------------------------
@@ -221,6 +259,27 @@ def _check_csp(path: str, scan: _PageScan) -> Iterator[Violation]:
         yield Violation(path, "csp", "인라인 스타일이 없는데 style-src 에 unsafe-inline")
 
 
+def _check_a11y(path: str, scan: _PageScan) -> Iterator[Violation]:
+    if scan.lang != "ko":
+        yield Violation(path, "a11y", f'<html lang="ko"> 가 아니다: lang="{scan.lang}"')
+    if not scan.skip_link:
+        yield Violation(path, "a11y", '본문 건너뛰기 링크(<a href="#main">)가 없다')
+    if scan.mains != ["main"]:
+        yield Violation(path, "a11y", f'<main id="main"> 이 정확히 하나여야 한다: {scan.mains}')
+    if not scan.navs:
+        yield Violation(path, "a11y", "<nav> 랜드마크가 없다")
+    if not scan.banners:
+        yield Violation(path, "a11y", "페이지 머리 <header> 랜드마크가 없다")
+    if not scan.contentinfos:
+        yield Violation(path, "a11y", "페이지 꼬리 <footer> 랜드마크가 없다")
+    for cls, text in scan.signals:
+        emoji, label = SIGNAL_TEXT[cls]
+        if emoji not in text and label not in text:
+            yield Violation(
+                path, "a11y", f"{cls} 가 색만으로 말한다 — 기호 {emoji} 나 글자 '{label}' 가 없다"
+            )
+
+
 def _check_page(path: str, text: str) -> Iterator[Violation]:
     if DISCLAIMER not in text:
         yield Violation(path, "disclaimer", "면책 문구(DISCLAIMER)가 없다")
@@ -240,6 +299,8 @@ def _check_page(path: str, text: str) -> Iterator[Violation]:
         yield Violation(path, "handler", f"인라인 이벤트 핸들러 {handler}")
     for url in scan.js_urls:
         yield Violation(path, "handler", f"javascript: 주소 {url}")
+
+    yield from _check_a11y(path, scan)
 
     for card in scan.cards:
         label = card.ident or "(id 없음)"

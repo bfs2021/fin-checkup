@@ -4,7 +4,7 @@
 
 :root {
   --ink: #1b1b19;
-  --ink-muted: #6e6e69;
+  --ink-muted: #686863; /* 모든 바탕·신호 옅은 색 위에서 4.5:1 이상 (test_site_a11y) */
   --border: #e4e4e0;
   --surface: #ffffff;
   --surface-sunk: #f7f7f5;
@@ -82,7 +82,9 @@ body {
 }
 
 a { color: var(--link); }
-a:focus-visible, input:focus-visible, button:focus-visible {
+/* 키보드 포커스는 늘 보인다 — 포커스 받을 수 있는 것 전부 (테스트가 선택자를 확인). */
+a:focus-visible, input:focus-visible, button:focus-visible, select:focus-visible,
+textarea:focus-visible, summary:focus-visible, [tabindex]:focus-visible {
   outline: 3px solid var(--focus);
   outline-offset: 2px;
 }
@@ -102,7 +104,7 @@ h3 { font-size: .9rem; color: var(--ink-muted); margin: 1.2rem 0 .5rem; letter-s
   position: absolute; left: -999px; top: 0;
   background: var(--surface); padding: .5rem .8rem; z-index: 10;
 }
-.fc-skip:focus { left: .5rem; top: .5rem; }
+.fc-skip:focus { left: .5rem; top: .5rem; outline: 3px solid var(--focus); }
 
 /* ── 머리·꼬리 ────────────────────────────────────────── */
 
@@ -112,6 +114,9 @@ h3 { font-size: .9rem; color: var(--ink-muted); margin: 1.2rem 0 .5rem; letter-s
   padding-top: .6rem; padding-bottom: .6rem;
 }
 .fc-brand { font-weight: 700; color: var(--ink); text-decoration: none; letter-spacing: -.01em; }
+.fc-nav { display: flex; flex-wrap: wrap; gap: .2rem .9rem; font-size: .9rem; }
+.fc-nav a { color: var(--ink); text-decoration: none; }
+.fc-nav a:hover { text-decoration: underline; }
 .fc-header .fc-search { flex: 1 1 14rem; }
 
 .fc-footer {
@@ -153,6 +158,7 @@ h3 { font-size: .9rem; color: var(--ink-muted); margin: 1.2rem 0 .5rem; letter-s
 .fc-landing .fc-search-input { font-size: 1.1rem; padding: .8rem 1rem; }
 .fc-landing-links { margin: 1rem 0 .4rem; }
 .fc-asof { font-size: .85rem; color: var(--ink-muted); font-variant-numeric: tabular-nums; }
+.fc-not-found-links { margin: 1.2rem 0 0; padding-left: 1.1rem; display: grid; gap: .3rem; }
 
 /* ── 신호 ─────────────────────────────────────────────── */
 
@@ -354,8 +360,6 @@ h3 { font-size: .9rem; color: var(--ink-muted); margin: 1.2rem 0 .5rem; letter-s
 
 /* ── 관심종목 (watch/index.html · _watch_toggle.html) ─────── */
 
-.fc-nav { display: flex; gap: .8rem; }
-.fc-nav a { color: var(--ink); font-size: .9rem; }
 .fc-watch-status { font-size: .85rem; color: var(--ink-muted); }
 .fc-watch-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .7rem; }
 .fc-watch-item { border: 1px solid var(--border); border-radius: 8px; padding: .7rem .8rem; background: var(--surface); }
