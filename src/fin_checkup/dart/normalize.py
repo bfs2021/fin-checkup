@@ -49,6 +49,28 @@ REVENUE = FieldSpec(
     ),
     account_names=("매출액", "수익(매출액)", "영업수익", "매출", "영업수익합계", "보험수익"),
 )
+#: 영업활동현금흐름.
+OPERATING_CASH_FLOW = FieldSpec(
+    "operating_cash_flow", CF,
+    account_ids=(
+        "ifrs-full_CashFlowsFromUsedInOperatingActivities",
+        "ifrs_CashFlowsFromUsedInOperatingActivities",
+    ),
+    account_names=(
+        "영업활동현금흐름",
+        "영업활동으로인한현금흐름",
+        "영업활동으로인한순현금흐름",
+        "영업활동순현금흐름",
+        "영업활동으로부터의순현금유입(유출)",
+    ),
+)
+#: '영업(활동)에서 창출된 현금' 은 이자·배당·법인세 전 소계다. 영업활동현금흐름 태그가 붙어 와도
+#: 다른 영업활동현금흐름 줄이 있으면 그쪽이다(인팩 2023·2024, 젝시믹스 2023).
+_CASH_GENERATED = "창출"
+#: 당기순이익 합계 줄 없이 지배기업·비지배 귀속 두 줄만 적는 회사(일진전기·웹케시 등)의 두 태그.
+PROFIT_TO_OWNERS_ID = "ifrs-full_ProfitLossAttributableToOwnersOfParent"
+PROFIT_TO_NONCONTROLLING_ID = "ifrs-full_ProfitLossAttributableToNoncontrollingInterests"
+
 #: 이자수익. '보험수익' 이 이보다 작으면 보험사가 아니라 은행·금융지주의 보험 자회사 한 부문이다.
 INTEREST_REVENUE_IDS = frozenset({
     "ifrs-full_RevenueFromInterest",
@@ -112,6 +134,7 @@ FIELD_SPECS: tuple[FieldSpec, ...] = (
         account_names=(
             "당기순이익", "당기순이익(손실)", "당기순손익", "당기순손실",
             "반기순이익", "분기순이익",
+            "연결당기순이익", "연결당기순이익(손실)", "당기연결순이익", "당기연결순이익(손실)",
         ),
     ),
     # 이자비용은 단독 계정만 여기서 찾는다. 없을 때의 대체 순서는 _interest_expense 가 맡는다.
@@ -122,18 +145,8 @@ FIELD_SPECS: tuple[FieldSpec, ...] = (
         absolute=True,
     ),
     # ── 현금흐름표 ──────────────────────────────────────────────
-    FieldSpec(
-        "operating_cash_flow", CF,
-        account_ids=(
-            "ifrs-full_CashFlowsFromUsedInOperatingActivities",
-            "ifrs_CashFlowsFromUsedInOperatingActivities",
-        ),
-        account_names=(
-            "영업활동현금흐름",
-            "영업활동으로인한현금흐름",
-            "영업활동으로인한순현금흐름",
-        ),
-    ),
+    # 영업활동현금흐름은 '창출된 현금' 줄을 걸러야 해서 normalize 가 _operating_cash_flow 로 다시 찾는다.
+    OPERATING_CASH_FLOW,
     # 설비투자는 합계 줄 → 종류별 합 → 유·무형 합계 순서가 필요해 _capex 가 따로 찾는다.
 )
 
@@ -225,9 +238,21 @@ _NOT_INTEREST = ("신종자본", "혼성자본")
 _NUMBERING = re.compile(r"^[(（]?[0-9０-９]+[.)．）]")
 
 
+#: 표 맨 윗단의 로마 숫자 머리('Ⅰ.매출액', 'VIII. 당기순이익'). 아라비아 숫자('1. 매출액')는
+#: 'Ⅰ. 영업수익' 아래 내역일 수 있어 떼지 않는다.
+_SECTION = re.compile(r"^(?:[ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩⅪⅫ]+|[IVX]+)[.．]")
+#: 이름 끝의 주석 번호('재고자산 (주7)', '자본금(주1,17)')와 마침표('당기순이익(손실).').
+_FOOTNOTE = re.compile(r"(?:\(주[0-9,]*\))+$|\.$")
+
+
 def _key(text: str) -> str:
     """공백을 제거해 표기 흔들림('매출채권 및 기타유동채권')을 흡수한다."""
     return "".join(text.split())
+
+
+def _name_key(text: str) -> str:
+    """계정명 비교용 열쇠: 공백 · 로마 숫자 머리 · 주석 번호를 뗀다."""
+    return _FOOTNOTE.sub("", _SECTION.sub("", _key(text)))
 
 
 def _find(lines: Iterable[AccountLine], spec: FieldSpec) -> float | None:
@@ -239,7 +264,7 @@ def _find(lines: Iterable[AccountLine], spec: FieldSpec) -> float | None:
     by_name: dict[str, float] = {}
     for ln in candidates:
         by_id.setdefault(_key(ln.account_id), ln.thstrm_amount)  # type: ignore[arg-type]
-        by_name.setdefault(_key(ln.account_nm), ln.thstrm_amount)  # type: ignore[arg-type]
+        by_name.setdefault(_name_key(ln.account_nm), ln.thstrm_amount)  # type: ignore[arg-type]
 
     found = [by_id.get(_key(account_id)) for account_id in spec.account_ids]
     found += [by_name.get(_key(account_nm)) for account_nm in spec.account_names]
@@ -250,6 +275,28 @@ def _find(lines: Iterable[AccountLine], spec: FieldSpec) -> float | None:
     # 않게, 0 이 아닌 후보가 있으면 그쪽이다. 후보가 전부 0 이면 0 이다(정말 0 인 회사).
     value = next((v for v in matches if v != 0), matches[0])
     return abs(value) if spec.absolute else value
+
+
+def _net_income(lines: Iterable[AccountLine], total: float | None) -> float | None:
+    """당기순이익. 합계 줄이 없으면 지배기업 귀속 + 비지배 귀속 — 두 줄이 다 있을 때만."""
+    if total is not None:
+        return total
+    parts = {
+        ln.account_id: ln.thstrm_amount
+        for ln in lines
+        if ln.sj_div in INCOME and ln.thstrm_amount is not None
+        and ln.account_id in (PROFIT_TO_OWNERS_ID, PROFIT_TO_NONCONTROLLING_ID)
+    }
+    if len(parts) < 2:
+        return None
+    return sum(parts.values())  # type: ignore[arg-type]
+
+
+def _operating_cash_flow(lines: list[AccountLine]) -> float | None:
+    """영업활동현금흐름. '창출된 현금' 소계 줄은 다른 후보가 없을 때만 쓴다."""
+    proper = [ln for ln in lines if _CASH_GENERATED not in ln.account_nm]
+    found = _find(proper, OPERATING_CASH_FLOW)
+    return found if found is not None else _find(lines, OPERATING_CASH_FLOW)
 
 
 def _revenue(lines: Iterable[AccountLine]) -> float | None:
@@ -382,6 +429,8 @@ def normalize_statements(raw: RawStatements) -> Financials:
     """원본 계정 줄 → 지표 계산용 Financials."""
     values = {spec.name: _find(raw.lines, spec) for spec in FIELD_SPECS}
     values["revenue"] = _revenue(raw.lines)
+    values["net_income"] = _net_income(raw.lines, values["net_income"])
+    values["operating_cash_flow"] = _operating_cash_flow(raw.lines)
     values["interest_expense"], source = _interest_expense(raw.lines, values["interest_expense"])
     values["trade_receivables"], receivable_source = _trade_receivables(raw.lines)
     values["capex"], capex_source = _capex(raw.lines)
