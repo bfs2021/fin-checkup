@@ -342,7 +342,7 @@ def test_badge_shows_signal_counts_and_fiscal_year_not_a_score():
     assert badge_label(COUNTS, 2025) == "fin-checkup | 🟢9 🟡4 🔴2 ⊘1 ⚫1 · 2025"
     assert "🟢9 🟡4 🔴2 ⊘1 ⚫1 · 2025" in root.find(f"{SVG}title").text
     visible = [t.text for t in root.iter(f"{SVG}text")]
-    assert visible == ["fin-checkup", "9", "4", "2", "1", "1", "· DART 2025"]
+    assert visible == ["fin-checkup", "정상 9", "주의 4", "위험 2", "1", "1", "· DART 2025"]
     lowered = svg.lower()
     for score in ("점수:", "점)", "/100", "score", "등급", "grade", "평균", "종합"):
         assert score not in lowered, f"배지에 종합 점수처럼 읽히는 '{score}'"
