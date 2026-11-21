@@ -144,6 +144,9 @@ REAL_ESTATE_NOT_APPLICABLE: dict[str, str] = {
     "inventory_turnover": "재고자산이 분양용 토지·건물이라 회전 주기가 사업 단위(수년)다.",
 }
 
+#: 계정을 못 찾아 ⚫가 될 때의 기본 메모. 해설(explain.why)이 다른 ⚫ 사유와 가르는 데 쓴다.
+MISSING_ACCOUNT_NOTE = "공시에서 필요한 계정을 찾지 못했다."
+
 NOT_APPLICABLE_BY_SECTOR: dict[Sector, dict[str, str]] = {
     Sector.FINANCIAL: FINANCIAL_NOT_APPLICABLE,
     Sector.REAL_ESTATE: REAL_ESTATE_NOT_APPLICABLE,
@@ -475,7 +478,7 @@ def checkup(
                 signal, note = forced
 
         if signal is Signal.UNKNOWN and not note:
-            note = "공시에서 필요한 계정을 찾지 못했다."
+            note = MISSING_ACCOUNT_NOTE
 
         metrics.append(
             Metric(

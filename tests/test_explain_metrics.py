@@ -61,6 +61,8 @@ def test_every_text_field_is_filled():
         for name in ("easy_name", "one_liner", "why_look", "basis"):
             assert getattr(e, name).strip(), f"{e.key}.{name} 이 비었다"
         assert e.pitfalls, f"{e.key} 에 한계/함정이 없다"
+        for rule in e.special_rules:
+            assert rule.when.strip() and rule.fact.strip(), (e.key, rule)
 
 
 # ── 경계값 문장은 엔진 값에서 만든다 ────────────────────────────────

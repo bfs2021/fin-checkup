@@ -14,6 +14,7 @@ from fin_checkup.explain.metrics import (
     get_explainer,
     threshold_text,
 )
+from fin_checkup.explain.why import why_color
 
 __all__ = [
     "METRIC_EXPLAINERS",
@@ -24,4 +25,5 @@ __all__ = [
     "explainers",
     "get_explainer",
     "threshold_text",
+    "why_color",
 ]
