@@ -229,7 +229,64 @@ uv run python -m fin_checkup.cli budget
 | DART `[020]` | 일별 허용량 초과. 재시도하지 않고 즉시 멈춘다(`RateLimitExceeded`). 내일까지 캐시로 버틴다 |
 | 건전한 기업이 🔴 | 업종 판정을 의심할 것. 4절 참고 |
 
-## 7. 검색 엔진에 사이트 알리기 (sitemap)
+## 7. 정적 사이트 (GitHub Pages)
+
+`https://younghwan91.github.io/fin-checkup/` 은 캐시만 읽어 만든 정적 파일이다. 사이트 빌드는 DART 를 부르지 않는다.
+데이터는 로컬에서 수집하고, 공개해도 되는 테이블만 릴리스로 올린다.
+
+```
+로컬 수집 (scripts/collect_universe.py)
+  → scripts/publish_snapshot.sh            # 허용목록 테이블 → data-YYYYMMDD 릴리스 (snapshot-*.zip + manifest.json)
+  → .github/workflows/pages.yml            # 릴리스 → 캐시 재구성 → (최근 위험 공시) → site build → site check → 배포
+```
+
+### 스냅샷 올리기
+
+메인 체크아웃(`.env`·`data/` 가 있는 곳)에서, 캐시를 쓰는 프로세스(수집·`serve`·Streamlit)를 모두 내린 뒤
+`scripts/publish_snapshot.sh` (태그 날짜를 바꾸려면 `scripts/publish_snapshot.sh 20261122`). 스냅샷에는
+`snapshot.py` 의 허용목록 테이블만 들어가고, 계정·키·관심종목·알림 기록 같은 개인정보·운영 테이블은 아예 빠진다.
+인증키처럼 생긴 값이 섞여 있으면 export 가 멈춘다.
+
+### Pages 워크플로가 도는 때와 하는 일
+
+- 언제: `data-*` 릴리스가 publish 될 때 · 매일 07:00 KST · 수동 실행(사업연도 지정 가능). 코드 릴리스(`data-` 가 아닌 태그)는 무시한다.
+- 가장 최근 `data-*` 릴리스를 받는다. **없으면 경고만 남기고 배포하지 않는다** — 지난 사이트가 그대로 남는다.
+- `snapshot import` 로 새 캐시를 만들고 `site build --base-url $SITE_URL` 로 빌드한다.
+- **`site check site-out`** 이 면책·계산식·CSP·외부 스크립트·인증키 패턴을 산출물에서 확인한다(규칙은 `site/guard.py`).
+  하나라도 걸리면 배포하지 않는다.
+- 배포는 한 번에 하나(`concurrency: pages`, 진행 중인 배포를 끊지 않는다).
+
+### secret `DART_API_KEY`
+
+사이트에서 DART 를 부르는 건 "최근 위험 공시" 한 단계뿐이다.
+
+| secret | 동작 |
+|---|---|
+| 없음 | 그 단계를 건너뛰고(notice) 공시 없이 배포한다 |
+| 있음 | `disclosures fetch --days 7 --max-pages 30` — 최대 150회 호출. 로컬 수집과 같은 키면 일별 허용량을 나눠 쓴다 |
+| 있는데 실패 (장애·`020`) | `continue-on-error` — 이번 빌드엔 공시가 빠지고 배포는 계속된다 |
+
+키는 그 단계의 `env` 로만 넘긴다. 빌드 로그·산출물에 찍히지 않게 하는 것이 DART 약관 제19조의 요구이고,
+`site check` 의 `secret` 규칙이 40자리 16진수·`crtfc_key` 를 산출물 전체에서 찾는다.
+
+### 로컬에서 다시 빌드하기
+
+```bash
+uv run python -m fin_checkup.cli site build --out site-out --limit 50   # 앞 50곳만 (확인용), 사업연도는 --year
+uv run python -m fin_checkup.cli site check site-out                     # 배포 전과 같은 가드
+uv run python -m http.server -d site-out 8080                            # http://localhost:8080/
+```
+
+- 기본 캐시는 현재 디렉터리의 `data/fin_checkup.duckdb` 다. 다른 캐시는 `FIN_CHECKUP_DB_PATH=<경로>` 로.
+- 배포본과 같은 데이터로 보려면 릴리스를 받아 캐시를 새로 만든다(`--db` 는 없는 파일이어야 한다):
+  `gh release download data-YYYYMMDD --pattern 'snapshot-*.zip'` → 압축 풀기 →
+  `uv run python -m fin_checkup.cli snapshot import <푼 폴더> --db /tmp/snap.duckdb` →
+  `FIN_CHECKUP_DB_PATH=/tmp/snap.duckdb uv run python -m fin_checkup.cli site build ...`
+- 출력 폴더는 빌드마다 통째로 비운다. 비어 있지 않은 폴더는 빌드 표식(`.fin-checkup-site`)이 있을 때만 비우고,
+  없으면 멈춘다 — 엉뚱한 폴더를 지우지 않게.
+- canonical·sitemap 같은 절대주소는 `--base-url https://…` 를 줄 때만 나온다. 페이지 사이 링크는 상대경로라 무관하다.
+
+### 검색 엔진에 사이트 알리기 (sitemap)
 
 `site build --base-url <사이트 주소>` 가 `sitemap.xml`(색인할 HTML 전부, lastmod = 빌드 날짜 KST)과
 `robots.txt` 를 만든다. `--base-url` 이 절대주소가 아니면 robots.txt 에 `Sitemap:` 줄이 빠지고 canonical 도 없다.
