@@ -199,6 +199,19 @@ h3 { font-size: .9rem; color: var(--ink-muted); margin: 1.2rem 0 .5rem; letter-s
 }
 .fc-hint { color: var(--ink-muted); font-size: .85rem; margin: .2rem 0 .6rem; }
 
+/* 한눈에 보기 — 묶음마다 한 줄, 카드 순서·신호 그대로. 이름을 누르면 그 카드로 간다. */
+.fc-glance h2 { margin-top: 0; }
+.fc-glance-groups { display: grid; grid-template-columns: max-content 1fr; gap: .45rem .8rem; margin: .4rem 0 .6rem; }
+.fc-glance-groups dt { font-weight: 600; font-size: .88rem; padding-top: .2rem; }
+.fc-glance-groups dd { margin: 0; }
+.fc-glance-list { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: .3rem; }
+.fc-glance-list li {
+  background: var(--tint); border: 1px solid var(--border); border-left: 3px solid var(--sig);
+  border-radius: 6px; font-size: .84rem; line-height: 1.35;
+}
+.fc-glance-list a { display: block; padding: .15rem .45rem; color: var(--ink); text-decoration: none; }
+.fc-glance-list a:hover { text-decoration: underline; }
+
 .fc-metrics { list-style: none; padding: 0; margin: 0; display: grid; gap: .6rem; }
 .fc-metric {
   border: 1px solid var(--border); border-left: 4px solid var(--sig);
