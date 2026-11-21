@@ -10,10 +10,11 @@
 
 from __future__ import annotations
 
+import logging
 import shutil
 import time
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
 
@@ -21,6 +22,7 @@ from fin_checkup.clock import kst_today
 from fin_checkup.config import Settings
 from fin_checkup.service import CheckupService
 from fin_checkup.site.context import OG_IMAGE_PAGE, CompanyEntry, Site, safe_output_path
+from fin_checkup.site.images.fonts import INSTALL_HINT, FontSet, resolve_fonts
 from fin_checkup.site.registry import Output, load_pages
 from fin_checkup.site.render import make_env
 from fin_checkup.site.sitemap import crawl_outputs, is_indexable
@@ -32,6 +34,8 @@ HISTORY_YEARS = 5
 
 Progress = Callable[[int, int], None]
 
+log = logging.getLogger(__name__)
+
 
 @dataclass(frozen=True)
 class BuildReport:
@@ -41,6 +45,10 @@ class BuildReport:
     files: int
     load_seconds: float
     render_seconds: float
+    #: 페이지 이름 → (파일 수, 걸린 초). 공유 카드 PNG 처럼 무거운 페이지의 시간을 따로 본다.
+    pages: dict[str, tuple[int, float]] = field(default_factory=dict)
+    #: PNG 를 못 만든 이유 (글꼴 없음). 만들었거나 --no-images 면 빈 문자열.
+    image_warning: str = ""
 
     @property
     def per_company_ms(self) -> float:
@@ -107,6 +115,16 @@ def _write(out: Path, output: Output) -> None:
         target.write_text(output.content, encoding="utf-8")
 
 
+def _image_fonts(images: bool, fonts: FontSet | None) -> tuple[FontSet | None, str]:
+    """(PNG 에 쓸 글꼴, 못 만드는 이유). --no-images 면 이유 없이 None."""
+    if not images:
+        return None, ""
+    fonts = fonts or resolve_fonts()
+    if fonts is None:
+        return None, f"공유 카드 PNG 를 건너뛴다(og:image 도 내지 않는다) — {INSTALL_HINT}"
+    return fonts, ""
+
+
 async def build_site(
     cache: Cache,
     out: Path,
@@ -115,12 +133,22 @@ async def build_site(
     base_url: str = "/",
     built_on: date | None = None,
     progress: Progress | None = None,
+    images: bool = True,
+    image_workers: int = 1,
+    fonts: FontSet | None = None,
 ) -> BuildReport:
+    """images=False 거나 한국어 글꼴이 없으면 PNG 페이지(`OG_IMAGE_PAGE`)를 이번 빌드에서 뺀다 — 두부(□)
+    그림을 내느니 없는 편이 낫고, 그림이 없으면 og:image 도 내지 않는다."""
     started = time.perf_counter()
     entries, skipped = await collect_companies(cache, year, limit, progress)
     loaded = time.perf_counter()
 
-    pages = load_pages()
+    pages = dict(load_pages())
+    image_fonts, image_warning = _image_fonts(images, fonts)
+    if image_fonts is None:
+        pages.pop(OG_IMAGE_PAGE, None)
+    if image_warning:
+        log.warning(image_warning)
     site = Site(
         year=year,
         built_on=built_on or kst_today(),
@@ -128,16 +156,22 @@ async def build_site(
         companies=entries,
         base_url=base_url,
         og_images=OG_IMAGE_PAGE in pages,
+        fonts=image_fonts,
+        image_workers=image_workers,
     )
     _prepare_out(out)
     files = 0
     indexable: list[str] = []
-    for _name, builder in sorted(pages.items()):
+    timings: dict[str, tuple[int, float]] = {}
+    for name, builder in sorted(pages.items()):
+        page_started, page_files = time.perf_counter(), 0
         for output in builder(site):
             _write(out, output)
             if is_indexable(output):
                 indexable.append(output.path)
-            files += 1
+            page_files += 1
+        timings[name] = (page_files, time.perf_counter() - page_started)
+        files += page_files
     # sitemap 은 다른 페이지가 전부 나온 뒤에야 만들 수 있다 — 레지스트리 밖, 마지막에.
     for output in crawl_outputs(site, indexable):
         _write(out, output)
@@ -149,4 +183,6 @@ async def build_site(
         files=files,
         load_seconds=loaded - started,
         render_seconds=time.perf_counter() - loaded,
+        pages=timings,
+        image_warning=image_warning,
     )

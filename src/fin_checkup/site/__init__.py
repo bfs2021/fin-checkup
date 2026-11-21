@@ -1,6 +1,6 @@
 """정적 사이트 생성기 — 캐시만 읽어 회사별 신호등 페이지를 만든다.
 
-    uv run python -m fin_checkup.cli site build --year 2024 --out site-out [--limit N]
+    uv run python -m fin_checkup.cli site build --year 2024 --out site-out [--limit N] [--no-images]
     uv run python -m fin_checkup.cli site check site-out   # 산출물 가드 (위반 시 종료 코드 1)
 
 구성
@@ -12,6 +12,8 @@
 - `render.py`   Jinja2 환경 (자동 이스케이프, StrictUndefined, `url()`·`DISCLAIMER` 전역)
 - `guard.py`    빌드 산출물 가드 — 면책·계산식/경계값·CSP·외부 스크립트·저장소·인증키 (`check_site`)
 - `templates/`  `company/index.html` 이 섹션마다 하나인 부분 템플릿 `company/_*.html` 을 include
+- `images/`     PNG (Pillow) — 한국어 글꼴 찾기·글꼴 지표 배치(`Canvas`)·공유 카드 `og/<코드>.png`.
+                한국어 글꼴이 없거나 `--no-images` 면 PNG 페이지와 og:image 를 이번 빌드에서 뺀다
 
 확장
 - 페이지 종류 추가: `pages/<이름>.py` 에 `@page("<이름>")` 빌더 하나.

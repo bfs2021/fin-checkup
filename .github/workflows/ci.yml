@@ -40,6 +40,17 @@ jobs:
       - name: 의존성 설치 (lock 고정)
         run: uv sync --all-extras --frozen
 
+      # PNG 그리기 테스트(tests/test_site_images.py)가 글꼴 지표로 넘침을 잰다. 글꼴이 없으면 건너뛰므로
+      # 여기서 깔아야 CI 가 실제로 검사한다. pages.yml 과 같은 패키지.
+      - name: 한국어 글꼴
+        run: |
+          if fc-list :lang=ko | grep -q .; then
+            echo "한국어 글꼴이 이미 있다"
+          else
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq --no-install-recommends fonts-noto-cjk
+          fi
+
       - name: ruff check
         run: uv run ruff check src tests scripts
 

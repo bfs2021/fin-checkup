@@ -30,6 +30,11 @@ class Settings(BaseSettings):
     sec_user_agent: str = ""
     sec_base_url: str = "https://data.sec.gov"
 
+    # 공유 카드·카드뉴스 PNG 에 쓸 한국어 글꼴(.ttf/.otf/.ttc). 비우면 시스템에서 찾는다
+    # (`site/images/fonts.py` 의 후보 목록 → fc-list). 못 찾으면 PNG 를 만들지 않는다 — 두부(□) 대신.
+    fin_checkup_font_regular: str = ""
+    fin_checkup_font_bold: str = ""
+
     @property
     def has_api_key(self) -> bool:
         return bool(self.dart_api_key.strip())

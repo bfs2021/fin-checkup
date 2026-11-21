@@ -88,8 +88,13 @@ class Site:
     companies: list[CompanyEntry] = field(default_factory=list)
     #: 절대주소용. 끝은 항상 '/'. 예: https://younghwan91.github.io/fin-checkup/
     base_url: str = "/"
-    #: 공유 카드 이미지가 이번 빌드에 생기는지 (`OG_IMAGE_PAGE` 가 등록돼 있으면 build 가 켠다).
+    #: 공유 카드 이미지가 이번 빌드에 생기는지. build 가 `OG_IMAGE_PAGE` 가 등록돼 있고
+    #: PNG 를 만들 수 있을 때(--images, 한국어 글꼴 있음)만 켠다.
     og_images: bool = False
+    #: PNG 에 쓸 한국어 글꼴 (`images.fonts.FontSet`). None 이면 PNG 를 만들지 않는다.
+    fonts: Any = None
+    #: PNG 를 나눠 그릴 프로세스 수.
+    image_workers: int = 1
 
     def __post_init__(self) -> None:
         if not self.base_url.endswith("/"):
