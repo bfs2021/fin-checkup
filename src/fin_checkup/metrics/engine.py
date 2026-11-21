@@ -299,13 +299,19 @@ def _ocf_ratio_override(
 def _turnaround(
     current: float | None, prior: float | None
 ) -> tuple[Signal, str] | None:
-    """전년이 0 이하일 때의 판정.
+    """전년이 0 이하이거나, 흑자에서 적자로 돌아섰을 때의 판정.
 
     증가율 퍼센트는 뜻을 잃지만(적자 -100 → -50이 '50% 개선'이 아니다), **적자에서
     흑자로 돌아섰는지**는 그 자체로 중요한 정보다. 실측에서 상장사의 40%가 여기
     해당해 ⚫로 묻히고 있었다.
     """
-    if prior is None or prior > 0 or current is None:
+    if prior is None or current is None:
+        return None
+    if prior > 0:
+        if current < 0:
+            # 증가율(−150% 등)은 그대로 낸다 — 경계값으로도 🔴 다. 숫자만으로는 '줄었다' 로 읽혀서
+            # 적자로 돌아섰다는 사실을 따로 적는다(2024 상장사 영업이익 203곳 · 순이익 250곳).
+            return Signal.RED, "전년 흑자에서 적자로 돌아섰다."
         return None
     if prior == 0:
         return Signal.UNKNOWN, "전년 값이 0이라 증가율을 낼 수 없다."
