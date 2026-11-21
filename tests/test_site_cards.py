@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import dataclasses
 import io
+from collections import Counter
 
 import pytest
 from hub_seed import seed_site_cache
@@ -21,6 +22,7 @@ from fin_checkup.metrics.signals import Signal
 from fin_checkup.site.build import collect_companies
 from fin_checkup.site.images.cards import (
     HEIGHT,
+    MORE,
     SOURCE_NAME,
     WIDTH,
     BannedPhraseError,
@@ -32,6 +34,7 @@ from fin_checkup.site.images.cards import (
     plain,
 )
 from fin_checkup.site.images.fonts import missing_glyphs, resolve_fonts
+from fin_checkup.site.images.layout import clamp_lines, wrap_text
 from fin_checkup.storage import Cache
 
 
@@ -72,7 +75,7 @@ def assert_card_rules(canvas, deck, fonts):
 async def test_every_card_has_source_disclaimer_and_stays_inside(checkups, fonts, code):
     deck = card_deck(checkups[code])
     pages = draw_deck(deck, fonts)
-    assert 5 <= len(pages) <= 6
+    assert 5 <= len(pages) <= 7
     for name, canvas in pages:
         assert name.startswith(f"{code}-")
         assert_card_rules(canvas, deck, fonts)
@@ -101,6 +104,68 @@ async def test_png_size(checkups, fonts):
         assert image.size == (WIDTH, HEIGHT) == (1080, 1350)
 
 
+def _bank_without_revenue(checkup):
+    """KB금융 2025 실데이터 모양 — 은행은 매출액 계정이 없어 영업이익률·순이익률이 ⚫ 다.
+    ⚫ 설명은 why_color 의 세 문장(계정·이유·0으로 안 채움)이라 길다. 2026-11-21 카드에서 이 문장이
+    '…않았을 수…' 로 잘렸다 (블록마다 같은 줄 수를 나눠 줘서 한 줄짜리 블록의 남는 자리를 버렸다)."""
+    for metric in checkup.result.metrics:
+        if metric.key in ("operating_margin", "net_margin", "revenue_growth"):
+            metric.value = None
+            metric.signal = Signal.UNKNOWN
+            metric.note = ""
+    return checkup
+
+
+def _section_pages(pages):
+    return [c for name, c in pages if "-section" in name]
+
+
+async def test_missing_account_why_is_drawn_whole_not_clipped(checkups, fonts):
+    deck = card_deck(_bank_without_revenue(checkups["105560"]))
+    pages = draw_deck(deck, fonts)
+    profit = next(s for s in deck.sections if s.title == "수익성")
+    assert [b.signal for b in profit.blocks].count(Signal.UNKNOWN) == 2
+    page = next(c for c in _section_pages(pages) if "수익성" in c.all_text())
+    text = page.all_text()
+    for block in profit.blocks:
+        assert squash(block.why) in squash(text), f"{block.label} 설명이 잘렸다"
+    assert "…" not in text
+    for _name, canvas in pages:
+        assert_card_rules(canvas, deck, fonts)
+
+
+@pytest.mark.parametrize("code", ["005930", "105560", "028300", "105560-bank"])
+async def test_every_metric_counted_on_the_summary_is_on_some_card(checkups, fonts, code):
+    """요약 장의 신호 개수(🟡 3 등)에 든 지표는 모두 어느 장엔가 있다 — 세었는데 못 찾는 지표가 없게."""
+    checkup = (
+        _bank_without_revenue(checkups["105560"]) if code == "105560-bank" else checkups[code]
+    )
+    deck = card_deck(checkup)
+    pages = draw_deck(deck, fonts)
+    assert len(pages) <= 7
+    shown = [b for s in deck.sections for b in s.blocks]
+    counted = {s: n for s, n in deck.chips if n}
+    assert dict(Counter(b.signal for b in shown)) == counted
+    assert sorted(b.label for b in shown) == sorted(m.label for m in checkup.result.metrics)
+    assert len(shown) == deck.total
+    drawn = squash("\n".join(c.all_text() for c in _section_pages(pages)))
+    for block in shown:
+        assert squash(block.label) in drawn, f"{block.label} 이 어느 장에도 없다"
+        assert squash(f"계산식: {block.formula}") in drawn
+        assert squash(block.band) in drawn
+        if block.signal is Signal.NOT_APPLICABLE:
+            assert squash(block.why_keep) in drawn, "⊘ 는 대신 볼 것을 남긴다"
+    assert "사이트에서볼수있어요" not in drawn, "블록을 빼지 않는다"
+
+
+def test_clamp_says_where_the_rest_is(fonts):
+    font = fonts.font(24)
+    lines = wrap_text("잘리는 문장이 여러 줄로 이어진다. " * 8, font, 600)
+    kept = clamp_lines(lines, font, 600, 2, MORE)
+    assert len(kept) == 2 and kept[-1].endswith(MORE)
+    assert font.getlength(kept[-1]) <= 600
+
+
 def _stress_deck() -> CardDeck:
     long_why = "아주 긴 설명이 이어지는 경우를 본다. " * 12
     block = MetricBlock(
@@ -127,6 +192,23 @@ def _stress_deck() -> CardDeck:
         sections=(Section("수익성", "부제", (block,) * 5),),
         page_url="https://a-very-long-custom-domain.example.com/some/deep/path/fin-checkup/c/900000/",
     )
+
+
+def test_a_too_long_why_is_cut_with_where_to_continue(fonts):
+    """줄이고도 넘치면 긴 설명만 줄 수를 자르고 끝에 '… 회사 페이지에서 계속' — 말없이 '…' 로 끊지 않는다."""
+    deck = _stress_deck()
+    base = deck.sections[0].blocks[0]
+    short = dataclasses.replace(base, why="짧은 설명이에요.", why_short="짧은 설명이에요.")
+    very_long = "아주 긴 설명이 이어지는 경우를 본다. " * 40
+    long = dataclasses.replace(base, why=very_long, why_short=very_long)
+    deck = dataclasses.replace(deck, sections=(Section("수익성", "부제", (short, long, short)),))
+    pages = draw_deck(deck, fonts)
+    page = next(c for name, c in pages if "-section" in name)
+    lines = [t for t, _ in page.texts]
+    assert any(t.endswith(MORE) for t in lines)
+    assert sum("짧은 설명이에요." in t for t in lines) == 2, "짧은 설명은 그대로"
+    for _name, canvas in pages:
+        assert_card_rules(canvas, deck, fonts)
 
 
 def test_worst_case_text_still_fits(fonts):
@@ -172,7 +254,7 @@ async def test_cli_writes_the_cards(tmp_path, monkeypatch, fonts, capsys):
     assert await _run(["site", "cards", "005930", "--year", "2024", "--out", str(out)]) == 0
     files = sorted(p.name for p in out.iterdir())
     assert files[0] == "005930-1-cover.png" and files[-1].endswith("-read.png")
-    assert 5 <= len(files) <= 6
+    assert 5 <= len(files) <= 7
     assert "docs/card-news.md" in capsys.readouterr().out
 
     assert await _run(["site", "cards", "999999", "--year", "2024", "--out", str(out)]) == 1
