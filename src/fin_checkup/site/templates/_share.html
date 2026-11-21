@@ -1,0 +1,10 @@
+{#
+  링크 공유 (static/share.js). 스크립트가 없으면 버튼은 숨은 채로 — 주소창이 곧 공유 수단이다.
+  인라인 핸들러를 쓰지 않는다 (CSP script-src 'self').
+#}
+<div class="fc-share">
+  <button type="button" class="fc-button fc-share-button" hidden>링크 복사</button>
+  <label class="fc-visually-hidden" for="fc-share-field">이 페이지 주소</label>
+  <input id="fc-share-field" class="fc-share-field" type="text" readonly hidden>
+  <span class="fc-share-status" role="status" aria-live="polite"></span>
+</div>
