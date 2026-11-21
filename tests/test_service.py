@@ -425,3 +425,53 @@ async def test_proxy_metric_gets_no_peer_rank_or_self_delta(service, cache):
     assert m.proxy is True
     assert "interest_coverage" not in result.peers
     assert "interest_coverage" not in result.deltas, "작년(이자 지급)과 올해(금융원가)는 분모가 다르다"
+
+
+def _seed_market_in_bulk(cache, count: int, industry: str = "999") -> list[str]:
+    """상장사 `count` 곳을 SQL 로 한 번에 심는다 — 하나씩 저장하면 수천 곳에 수십 초가 걸린다.
+
+    대조군 모집단은 '재무가 있는 상장사' 이고 값은 미리 계산된 metric_values 에서 온다.
+    """
+    codes = [f"8{i:07d}" for i in range(count)]
+    cache.conn.execute(
+        "INSERT INTO companies (corp_code, corp_name, stock_code, market, industry_code, fetched_at) "
+        "SELECT '8' || lpad(i::VARCHAR, 7, '0'), '회사' || i, lpad(i::VARCHAR, 6, '0'), 'KOSDAQ', ?, now() "
+        "FROM range(?) t(i)",
+        [industry, count],
+    )
+    cache.conn.execute(
+        "INSERT INTO statement_lines (corp_code, bsns_year, reprt_code, fs_div, sj_div, account_id, "
+        "account_nm, thstrm_amount, fetched_at) "
+        "SELECT '8' || lpad(i::VARCHAR, 7, '0'), 2024, '11011', 'CFS', 'BS', 'ifrs-full_Assets', "
+        "'자산총계', 1.0, now() FROM range(?) t(i)",
+        [count],
+    )
+    cache.conn.execute(
+        "INSERT INTO metric_values (corp_code, bsns_year, metric_key, value) "
+        "SELECT '8' || lpad(i::VARCHAR, 7, '0'), 2024, 'debt_ratio', i::DOUBLE FROM range(?) t(i)",
+        [count],
+    )
+    return codes
+
+
+async def test_market_peer_group_is_not_capped(service, cache):
+    """시장 전체 대조군을 앞의 2,000곳(corp_code 순)에서 조용히 잘랐다 — 상장사는 ~2,540곳.
+
+    잘린 쪽은 corp_code 가 큰(늦게 등록된) 회사들이라 중앙값이 한쪽으로 치우친다.
+    CLI·Streamlit·API·사이트가 모두 같은 함수를 쓴다.
+    """
+    from fin_checkup.metrics.peers import PeerScope
+
+    count = 2_500
+    _seed_market_in_bulk(cache, count)
+    cache.save_company(_company("00126380", industry="264"))
+    cache.save_statements(statements(2024, 1000.0))
+
+    assert len(cache.list_with_statements(2024)) == count + 1
+    with respx.mock:
+        result = await service.run(SAMSUNG, end_year=2024, allow_fetch=False)
+    assert result is not None
+    stat = result.peers["debt_ratio"]
+    assert stat.scope is PeerScope.MARKET
+    assert stat.sample_size == count
+    assert stat.median == (count - 1) / 2

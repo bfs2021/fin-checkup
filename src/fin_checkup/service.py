@@ -330,7 +330,7 @@ class CheckupService:
         전년 재무를 함께 넘긴다 — 안 넘기면 성장성 지표가 통째로 빠져서 대조군에
         나타나지 않는다. 화면에서 성장성 카드만 휑하게 비는 걸로 드러났다.
         """
-        corp_codes = self.cache.list_with_statements(bsns_year, limit=100_000, listed_only=False)
+        corp_codes = self.cache.list_with_statements(bsns_year, listed_only=False)
         done = 0
         for start in range(0, len(corp_codes), batch):
             chunk = corp_codes[start : start + batch]
