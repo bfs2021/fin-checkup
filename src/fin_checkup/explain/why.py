@@ -51,7 +51,7 @@ def why_color(
 
     # 값 없이 규칙으로 색이 정해진 경우 (흑자 전환·무차입·자본잠식).
     if metric.value is None:
-        rule = next((r for r in explainer.special_rules if r.signal is signal), None)
+        rule = next((r for r in explainer.special_rules if r.matches(signal, metric.note)), None)
         reason = rule.fact if rule else metric.note
         return f"{topic(name)} {signal.emoji} {is_(signal.label)} — {reason}"
 
@@ -81,7 +81,7 @@ def why_color(
     if basis:
         return f"{sentence} {basis}"
     # 경계값과 같은 색이어도 규칙이 따로 짚은 사실이 있으면 덧붙인다 (흑자인데 현금 유출).
-    rule = next((r for r in explainer.special_rules if r.signal is signal), None)
+    rule = next((r for r in explainer.special_rules if r.matches(signal, metric.note)), None)
     if rule is not None and metric.note:
         sentence += f" {rule.fact}"
     return sentence

@@ -122,6 +122,14 @@ def test_revenue_growth_needs_prior_year():
     assert m.signal is Signal.GREEN
 
 
+def test_growth_compares_against_this_reports_prior_column_first():
+    """작년 보고서 숫자보다 올해 보고서의 전기 열이 우선이다 — 재작성·연결 범위가 올해와 같다."""
+    current = fin(revenue=1200, comparative=fin(bsns_year=2023, revenue=1000))
+    stale = fin(bsns_year=2023, fs_div=FsDiv.OFS, revenue=500)
+    assert get(checkup(current, prior=stale), "revenue_growth").value == pytest.approx(20.0)
+    assert get(checkup(current), "revenue_growth").value == pytest.approx(20.0)
+
+
 def test_growth_is_unknown_without_prior_year():
     m = get(checkup(fin(revenue=1200)), "revenue_growth")
     assert m.signal is Signal.UNKNOWN
@@ -156,6 +164,18 @@ def test_turnaround_to_profit_is_green():
     metric = get(result, "operating_income_growth")
     assert metric.signal is Signal.GREEN
     assert "흑자로 돌아섰다" in metric.note
+
+
+def test_turn_from_profit_to_loss_is_labelled():
+    """전년 흑자 → 올해 적자. 증가율(−150%)은 그대로 두고 적자 전환을 비고로 밝힌다.
+
+    2024 상장사 영업이익 203곳 · 순이익 250곳이 여기 해당하는데 숫자만 나갔다.
+    """
+    result = checkup(fin(operating_income=-50), prior=fin(bsns_year=2023, operating_income=100))
+    metric = get(result, "operating_income_growth")
+    assert metric.value == pytest.approx(-150.0)
+    assert metric.signal is Signal.RED
+    assert "흑자에서 적자로 돌아섰다" in metric.note
 
 
 def test_widening_loss_is_distinguished_from_narrowing_loss():

@@ -8,8 +8,9 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 
+from fin_checkup.site import incremental
 from fin_checkup.site.context import OG_IMAGE_PAGE, Site
-from fin_checkup.site.images.og import og_card_for, og_path, render_many
+from fin_checkup.site.images.og import OgCard, og_card_for, og_path, render_many
 from fin_checkup.site.registry import Output, page
 
 
@@ -26,5 +27,21 @@ def og_images(site: Site) -> Iterator[Output]:
         return
     label = site_label(site)
     cards = [og_card_for(entry, label) for entry in site.companies]
-    for card, png in zip(cards, render_many(cards, site.fonts, site.image_workers), strict=True):
+    for card, png in zip(cards, _pngs(site, cards), strict=True):
         yield Output(og_path(card.stock_code), png)
+
+
+def _pngs(site: Site, cards: list[OgCard]) -> list[bytes]:
+    """카드 PNG. 증분 캐시가 있으면 카드 내용·글꼴·코드 판이 같은 그림은 다시 그리지 않는다."""
+    cache = site.build_cache
+    if cache is None:
+        return list(render_many(cards, site.fonts, site.image_workers))
+    fonts = incremental.fonts_id(site.fonts)
+    keys = [incremental.key("og", incremental.code_version(), fonts, card) for card in cards]
+    pngs = [cache.get_bytes(k) for k in keys]
+    todo = [i for i, png in enumerate(pngs) if png is None]
+    drawn = render_many([cards[i] for i in todo], site.fonts, site.image_workers)
+    for i, png in zip(todo, drawn, strict=True):
+        cache.put_bytes(keys[i], png)
+        pngs[i] = png
+    return [png for png in pngs if png is not None]

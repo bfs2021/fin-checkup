@@ -258,6 +258,11 @@ class Financials(BaseModel):
     #: capex 의 출처. 값이 없으면 None.
     capex_source: CapexSource | None = None
 
+    #: 같은 보고서의 전기 열(frmtrm)로 낸 작년. 성장성·작년 대비는 이것과 견준다 — 작년 보고서는
+    #: 그 뒤의 재작성(중단영업 재분류·합병·회계정책 변경)도, 올해의 연결/개별 기준도 모른다.
+    #: 전기 열이 없는 보고서(DART 일부·SEC)는 None.
+    comparative: Financials | None = Field(default=None, exclude=True, repr=False)
+
     @property
     def free_cash_flow(self) -> float | None:
         if self.operating_cash_flow is None or self.capex is None:

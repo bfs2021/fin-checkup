@@ -3,6 +3,7 @@
   넘길 값: blocks(sector.MetricBlock 목록), min_peers, show_signals(신호 비율 표시 여부).
   값으로 회사를 고르거나 줄 세우지 않는다 — 여기엔 회사 이름이 없다.
 #}
+{% from "_signal.html" import mark, badge %}
 <ul class="fc-metrics fc-dist">
   {% for b in blocks %}
   {% set d = b.dist %}
@@ -23,18 +24,18 @@
     {% if show_signals %}
     <ul class="fc-shares" aria-label="{{ d.spec.label }} 신호 비율">
       {% for s in d.signals %}
-      <li class="sig-{{ s.signal.value }}"><span aria-hidden="true">{{ s.signal.emoji }}</span> {{ s.signal.label }} {{ s.percent }}% <small>({{ "{:,}".format(s.count) }}곳)</small></li>
+      <li class="sig-{{ s.signal.value }}">{{ mark(s.signal.value) }}{{ s.signal.label }} {{ s.percent }}% <small>({{ "{:,}".format(s.count) }}곳)</small></li>
       {% endfor %}
     </ul>
     {% endif %}
     <dl class="fc-basis-list">
       <dt>계산식</dt><dd>{{ d.spec.formula }}</dd>
       {% for t in b.thresholds %}
-      <dt>경계값{% if t.sector_label %} ({{ t.sector_label }}){% endif %}</dt><dd>{{ t.text }}</dd>
+      <dt>경계값{% if t.sector_label %} ({{ t.sector_label }}){% endif %}</dt><dd>{{ t.text | marks }}</dd>
       {% endfor %}
     </dl>
     {% if d.excluded_text %}
-    <p class="fc-note">분포에서 뺀 회사: {{ d.excluded_text }} (전체 {{ "{:,}".format(d.total) }}곳). 없는 값을 0으로 세지 않습니다.</p>
+    <p class="fc-note">분포에서 뺀 회사: {{ d.excluded_text | marks }} (전체 {{ "{:,}".format(d.total) }}곳). 없는 값을 0으로 세지 않습니다.</p>
     {% endif %}
   </li>
   {% endfor %}

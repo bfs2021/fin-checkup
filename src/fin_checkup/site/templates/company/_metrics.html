@@ -1,3 +1,4 @@
+{% from "_signal.html" import mark, badge %}
 <section class="fc-section" id="metrics" aria-labelledby="metrics-title">
   <h2 id="metrics-title">지표 {{ c.groups | map(attribute="rows") | map("length") | sum }}개</h2>
   <p class="fc-hint">모든 지표에 계산식과 경계값을 함께 적습니다. 묶음 안에서는 위험한 것부터 보입니다.</p>
@@ -7,7 +8,7 @@
     {% for m in group.rows %}
     <li class="fc-metric sig-{{ m.signal.key }}" id="m-{{ m.key }}">
       <div class="fc-metric-head">
-        <span class="fc-sig"><span aria-hidden="true">{{ m.signal.emoji }}</span> {{ m.signal.label }}</span>
+        {{ badge(m.signal.key, m.signal.label) }}
         <span class="fc-metric-label"><a href="{{ url('m/' ~ m.key ~ '/') }}" title="{{ m.label }} 해설">{{ m.label }}</a></span>
         <span class="fc-metric-value{% if m.missing %} muted{% endif %}">{{ m.value_text }}</span>
       </div>

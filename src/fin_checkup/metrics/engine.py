@@ -299,13 +299,19 @@ def _ocf_ratio_override(
 def _turnaround(
     current: float | None, prior: float | None
 ) -> tuple[Signal, str] | None:
-    """전년이 0 이하일 때의 판정.
+    """전년이 0 이하이거나, 흑자에서 적자로 돌아섰을 때의 판정.
 
     증가율 퍼센트는 뜻을 잃지만(적자 -100 → -50이 '50% 개선'이 아니다), **적자에서
     흑자로 돌아섰는지**는 그 자체로 중요한 정보다. 실측에서 상장사의 40%가 여기
     해당해 ⚫로 묻히고 있었다.
     """
-    if prior is None or prior > 0 or current is None:
+    if prior is None or current is None:
+        return None
+    if prior > 0:
+        if current < 0:
+            # 증가율(−150% 등)은 그대로 낸다 — 경계값으로도 🔴 다. 숫자만으로는 '줄었다' 로 읽혀서
+            # 적자로 돌아섰다는 사실을 따로 적는다(2024 상장사 영업이익 203곳 · 순이익 250곳).
+            return Signal.RED, "전년 흑자에서 적자로 돌아섰다."
         return None
     if prior == 0:
         return Signal.UNKNOWN, "전년 값이 0이라 증가율을 낼 수 없다."
@@ -532,6 +538,17 @@ METRIC_DEFS: tuple[MetricDef, ...] = (
 )
 
 
+def comparison_base(current: Financials, prior: Financials | None) -> Financials | None:
+    """작년과 견줄 때 쓸 작년. 올해 보고서의 전기 열이 있으면 그것, 없으면 작년 보고서.
+
+    작년 보고서의 당기 숫자는 그 뒤의 재작성을 모르고, 연결/개별이 올해와 다를 수 있다.
+    2024 상장사 2,404곳(두 해 모두 있음) 중 83곳이 두 해의 연결/개별이 갈렸고, 같은 기준이어도
+    전기 매출이 10% 넘게 다시 적힌 곳이 57곳, 영업이익은 114곳이었다 — (주)효성은 분할로 전기
+    매출이 3.44조 → 1.85조로 재분류돼 매출액 증가율이 −33.9% 🔴 로 나가고 있었다(전기 열 기준 +23.0%).
+    """
+    return current.comparative if current.comparative is not None else prior
+
+
 def checkup(
     current: Financials,
     prior: Financials | None = None,
@@ -539,9 +556,11 @@ def checkup(
 ) -> CheckupResult:
     """한 회계기간의 재무 건강검진 결과를 만든다.
 
-    prior를 주면 성장성 지표까지 채워진다. sector를 주면 그 업종에 적용할 수 없는
-    지표를 판정하지 않는다 — 은행에 유동비율을 들이대지 않기 위한 것이다.
+    prior를 주면 성장성 지표까지 채워진다 — 단 올해 보고서에 전기 열이 있으면 그쪽이 먼저다
+    (`comparison_base`). sector를 주면 그 업종에 적용할 수 없는 지표를 판정하지 않는다 —
+    은행에 유동비율을 들이대지 않기 위한 것이다.
     """
+    prior = comparison_base(current, prior)
     not_applicable = NOT_APPLICABLE_BY_SECTOR.get(sector, {})
     metrics: list[Metric] = []
 

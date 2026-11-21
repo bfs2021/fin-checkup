@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import date
+from pathlib import Path
 
 import pytest
 from hub_seed import seed_site_cache
@@ -279,3 +280,20 @@ def test_cli_site_check_fails_and_lists_violations(out, capsys):
     printed = capsys.readouterr().out
     assert "c/005930/index.html: [disclaimer]" in printed
     assert "c/005930/index.html: [csp]" in printed
+
+
+def test_cli_site_check_fails_when_too_few_company_pages(out, capsys):
+    # 데이터에 없는 사업연도로 빌드하면 회사 몇 곳짜리 사이트가 다른 가드를 다 통과한 채 나갔다.
+    assert main(["site", "check", str(out), "--min-companies", "100000"]) == 1
+    assert "[coverage]" in capsys.readouterr().out
+
+
+def test_cli_site_check_coverage_passes_at_or_below_page_count(out):
+    pages = len(list((out / "c").glob("*/index.html")))
+    assert pages > 0
+    assert main(["site", "check", str(out), "--min-companies", str(pages)]) == 0
+
+
+def test_pages_workflow_guards_coverage():
+    workflow = Path(__file__).resolve().parents[1] / ".github" / "workflows" / "pages.yml"
+    assert "site check site-out --min-companies" in workflow.read_text(encoding="utf-8")

@@ -1,0 +1,19 @@
+{#
+  한눈에 보기 — 첫 화면에서 아래 지표 카드를 묶음별로 미리 본다. 카드 순서·신호 그대로(새 점수·판단 없음),
+  이름을 누르면 그 카드로 간다. 지표 신호와 '위험 신호'(자본잠식·연속 영업손실 등)는 다른 것이라 따로 적는다.
+#}
+{% from "_signal.html" import mark, badge %}
+<section class="fc-section fc-glance" id="glance" aria-labelledby="glance-title">
+  <h2 id="glance-title">한눈에 보기</h2>
+  <dl class="fc-glance-groups">
+  {% for group in c.groups %}
+    <dt>{{ group.category }}</dt>
+    <dd><ul class="fc-glance-list">{% for m in group.rows %}<li class="sig-{{ m.signal.key }}"><a href="#m-{{ m.key }}">{{ mark(m.signal.key) }}{{ m.label }}<span class="fc-visually-hidden"> {{ m.signal.label }}</span></a></li>{% endfor %}</ul></dd>
+  {% endfor %}
+    <dt>위험 신호</dt>
+    <dd>{% if c.red_flags %}<ul class="fc-glance-list">{% for flag in c.red_flags %}<li class="sig-red"><a href="#red-flags">{{ mark("red") }}<span class="fc-visually-hidden">위험 신호: </span>{{ flag.label }}</a></li>{% endfor %}</ul>{% else %}<a href="#red-flags">없음</a> <span class="fc-hint">(자본잠식·연속 영업손실 등)</span>{% endif %}</dd>
+  </dl>
+  <p class="fc-hint">신호등은 숫자 하나가 경계값의 어느 구간에 있는지 잰 결과입니다. 회사 전체에 대한 평가나 투자 판단이 아닙니다.
+  '위험 신호'는 지표 색과 따로, 자본잠식·몇 해 연속 영업손실처럼 재무제표로 바로 확인되는 일을 봅니다.
+  <a href="{{ url('learn/') }}#legend">신호등 읽는 법</a></p>
+</section>

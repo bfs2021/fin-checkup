@@ -7,6 +7,7 @@
     python -m fin_checkup.cli poll --dry-run  # 위험 공시 확인
     python -m fin_checkup.cli site build      # 정적 사이트 (캐시만 읽음)
     python -m fin_checkup.cli site check site-out  # 빌드 산출물 가드 (면책·CSP·인증키 …)
+    python -m fin_checkup.cli site links site-out  # 깨진 내부 링크 (외부 링크는 보고만)
 """
 
 from __future__ import annotations
@@ -481,25 +482,41 @@ async def cmd_budget(args: argparse.Namespace) -> int:
 async def cmd_site_build(args: argparse.Namespace) -> int:
     """캐시만 읽어 정적 사이트를 만든다. DART 를 부르지 않는다."""
     from fin_checkup.site.build import build_site
+    from fin_checkup.site.buildinfo import read_snapshot_info
     from fin_checkup.site.context import OG_IMAGE_PAGE
+    from fin_checkup.site.disclosures import DisclosureFormatError, load_disclosures
+    from fin_checkup.snapshot import SnapshotError
 
     db_path = Path(settings.fin_checkup_db_path)
     if not db_path.exists():
         print(f"캐시 DB 가 없습니다: {db_path}  (FIN_CHECKUP_DB_PATH 로 지정할 수 있습니다)")
         return 1
 
+    snapshot = None
+    if args.snapshot:
+        try:
+            snapshot = read_snapshot_info(args.snapshot)
+        except SnapshotError as exc:
+            print(f"스냅샷 manifest 를 읽지 못했습니다: {exc}")
+            return 1
+
     def progress(done: int, total: int) -> None:
         if done % 200 == 0 or done == total:
             print(f"  건강검진 {done:,}/{total:,}", flush=True)
 
-    disclosures = None
+    feed = None
     if args.disclosures:
-        from fin_checkup.disclosures import read_json
-
+        # 못 읽으면 공시 없이 만든다(공시 섹션·피드 항목이 빠질 뿐). Actions 에선 경고로 남긴다.
         try:
-            disclosures = read_json(args.disclosures)
-        except (OSError, ValueError) as exc:
-            print(f"공시 JSON 을 읽지 못했습니다 — 공시 없이 만듭니다: {exc}")
+            feed = load_disclosures(args.disclosures)
+        except DisclosureFormatError as exc:
+            prefix = "::warning::" if os.environ.get("GITHUB_ACTIONS") else ""
+            print(f"{prefix}공시 JSON 을 읽지 못했습니다 — 공시 없이 만듭니다: {exc}")
+        else:
+            print(
+                f"최근 위험 공시 {feed.begin}~{feed.end} {len(feed.items):,}건"
+                + (f" (형식 밖 {feed.dropped}건 뺌)" if feed.dropped else "")
+            )
 
     out = Path(args.out)
     with Cache(db_path, read_only=True) as cache:
@@ -513,7 +530,10 @@ async def cmd_site_build(args: argparse.Namespace) -> int:
                 progress=progress,
                 images=args.images,
                 image_workers=args.image_workers,
-                disclosures=disclosures,
+                disclosures=feed,
+                snapshot=snapshot,
+                jobs=args.jobs,
+                incremental_dir=Path(args.incremental) if args.incremental else None,
             )
         except FileExistsError as exc:
             print(str(exc))
@@ -531,19 +551,28 @@ async def cmd_site_build(args: argparse.Namespace) -> int:
             f"  공유 카드 PNG {n:,}장 · {seconds:.1f}초 · 장당 {per:.0f}ms "
             f"(프로세스 최대 {args.image_workers}개)"
         )
-    if report.image_warning:
-        # GitHub Actions 에선 워크플로 요약에 경고 주석으로 뜬다.
-        prefix = "::warning::" if os.environ.get("GITHUB_ACTIONS") else "경고: "
-        print(f"{prefix}{report.image_warning}")
+    if report.cache_summary:
+        print(f"  {report.cache_summary}")
+    # GitHub Actions 에선 워크플로 요약에 경고 주석으로 뜬다.
+    prefix = "::warning::" if os.environ.get("GITHUB_ACTIONS") else "경고: "
+    for warning in [report.image_warning, *report.warnings]:
+        if warning:
+            print(f"{prefix}{warning}")
     return 0
 
 
 async def cmd_site_check(args: argparse.Namespace) -> int:
     """빌드된 사이트가 넘지 않는 선을 지키는지 (면책·계산식·CSP·외부 스크립트·저장소·인증키)."""
-    from fin_checkup.site.guard import check_site
+    from fin_checkup.site.buildinfo import check_freshness
+    from fin_checkup.site.guard import check_coverage, check_site
 
     out = Path(args.out_dir)
-    violations = check_site(out)
+    # 오래된 사업연도는 위반이 아니라 사람이 볼 경고 — 종료 코드에 넣지 않는다.
+    stale = check_freshness(out)
+    if stale:
+        prefix = "::warning::" if os.environ.get("GITHUB_ACTIONS") else "경고: "
+        print(f"{prefix}{stale}")
+    violations = check_site(out) + check_coverage(out, args.min_companies)
     files = sum(1 for p in out.rglob("*") if p.is_file()) if out.is_dir() else 0
     if not violations:
         print(f"{out}/ — 파일 {files:,}개 검사, 위반 없음")
@@ -551,6 +580,26 @@ async def cmd_site_check(args: argparse.Namespace) -> int:
     for violation in violations:
         print(violation)
     print(f"\n{out}/ — 파일 {files:,}개 중 위반 {len(violations):,}건 (규칙은 fin_checkup/site/guard.py)")
+    return 1
+
+
+async def cmd_site_links(args: argparse.Namespace) -> int:
+    """빌드된 사이트의 내부 링크가 실제 파일·앵커로 이어지는지. 외부 링크는 목록만."""
+    from fin_checkup.site.links import check_links, format_report
+
+    out = Path(args.out_dir)
+    if not out.is_dir():
+        print(f"{out}/ 가 없다 — site build 의 출력 폴더를 지정하세요.")
+        return 1
+    report = check_links(out, args.base_url)
+    for line in format_report(report):
+        print(line)
+    summary = f"{out}/ — HTML {report.pages:,}개 · 내부 링크 {report.internal:,}개"
+    summary += f" · 외부 {len(report.external):,}종"
+    if report.ok:
+        print(f"\n{summary} — 깨진 내부 링크 없음")
+        return 0
+    print(f"\n{summary} — 깨진 내부 링크 {len(report.broken):,}건")
     return 1
 
 
@@ -715,12 +764,24 @@ def main(argv: list[str] | None = None) -> int:
     )
     p_site_build.add_argument(
         "--disclosures", default=None,
-        help="`disclosures fetch` 가 쓴 JSON — 회사별·시장 전체 Atom 피드에 위험 공시를 싣는다 (없으면 생략)",
+        help="`disclosures fetch` 가 쓴 JSON — 회사 페이지·첫 화면 최근 위험 공시와 Atom 피드에 싣는다",
+    )
+    p_site_build.add_argument(
+        "--snapshot", default=None,
+        help="`snapshot import` 한 폴더(manifest.json). 주면 꼬리·build.json 에 스냅샷 날짜를 적는다",
+    )
+    p_site_build.add_argument(
+        "--jobs", type=int, default=1,
+        help="건강검진 계산을 나눌 프로세스 수 (DB 를 읽기 전용으로 여는 site build 에서만)",
+    )
+    p_site_build.add_argument(
+        "--incremental", default=None, metavar="DIR",
+        help="증분 빌드 캐시 폴더 — 코드·데이터가 같은 건강검진과 공유 카드 PNG 를 다시 만들지 않는다",
     )
     p_site_build.set_defaults(func=cmd_site_build)
 
     p_site_cards = site_sub.add_parser(
-        "cards", help="카드뉴스 PNG (1080×1350, 5~6장) — 만들기만 하고 올리지 않는다"
+        "cards", help="카드뉴스 PNG (1080×1350, 7장 이하) — 만들기만 하고 올리지 않는다"
     )
     p_site_cards.add_argument("stock_code", help="종목코드 6자리")
     p_site_cards.add_argument("--out", required=True, help="PNG 를 쓸 폴더")
@@ -735,7 +796,22 @@ def main(argv: list[str] | None = None) -> int:
         "check", help="빌드된 사이트를 가드 규칙으로 검사 (위반이 있으면 종료 코드 1)"
     )
     p_site_check.add_argument("out_dir", help="site build 의 출력 폴더")
+    p_site_check.add_argument(
+        "--min-companies",
+        type=int,
+        default=0,
+        help="회사 페이지가 이보다 적으면 위반 (0 이면 검사 안 함, Pages 배포는 2000)",
+    )
     p_site_check.set_defaults(func=cmd_site_check)
+    p_site_links = site_sub.add_parser(
+        "links", help="빌드된 사이트의 깨진 내부 링크 검사 (있으면 종료 코드 1, 외부 링크는 보고만)"
+    )
+    p_site_links.add_argument("out_dir", help="site build 의 출력 폴더")
+    p_site_links.add_argument(
+        "--base-url", default="/",
+        help="site build 에 준 것과 같은 주소. 그 아래 절대주소(canonical 등)도 내부 링크로 검사한다",
+    )
+    p_site_links.set_defaults(func=cmd_site_links)
 
     args = parser.parse_args(argv)
     try:

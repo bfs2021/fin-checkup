@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from functools import cached_property
 from posixpath import normpath
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from urllib.parse import urlsplit
 
 from jinja2 import Environment
@@ -24,6 +24,11 @@ from fin_checkup.models import CorpCode
 from fin_checkup.service import Checkup
 from fin_checkup.site.registry import Output
 from fin_checkup.site.season import SeasonView, season_view
+
+if TYPE_CHECKING:
+    from fin_checkup.site.buildinfo import SnapshotInfo
+    from fin_checkup.site.disclosures import DisclosureFeed
+    from fin_checkup.site.incremental import BuildCache
 
 
 @dataclass(frozen=True)
@@ -96,9 +101,13 @@ class Site:
     fonts: Any = None
     #: PNG 를 나눠 그릴 프로세스 수.
     image_workers: int = 1
-    #: `cli disclosures fetch` 가 쓴 최근 위험 공시 JSON (`disclosures.read_json`). 없으면 None —
-    #: 공시를 쓰는 페이지(피드 등)는 공시 없이 만든다.
-    disclosures: dict | None = None
+    #: `cli disclosures fetch` 가 쓴 최근 위험 공시 (`site/disclosures.py` 가 검증). 없으면 None —
+    #: 회사 페이지·첫 화면 공시 섹션은 생기지 않고, 피드는 공시 없이 만든다.
+    disclosures: DisclosureFeed | None = None
+    #: 스냅샷 manifest (`site build --snapshot`). 꼬리의 데이터 기준 줄에 날짜를 적는다.
+    snapshot: SnapshotInfo | None = None
+    #: 증분 빌드 캐시 (`site build --incremental`). 비싼 산출물(공유 카드 PNG)이 내용 열쇠로 재사용한다.
+    build_cache: BuildCache | None = None
 
     def __post_init__(self) -> None:
         if not self.base_url.endswith("/"):
@@ -108,6 +117,11 @@ class Site:
     def season(self) -> SeasonView:
         """데이터 기준일·다가오는 정기 공시 기한 (`templates/_season.html`)."""
         return season_view(self.year, self.built_on)
+
+    @cached_property
+    def company_paths(self) -> frozenset[str]:
+        """이번 빌드에 페이지가 생기는 회사 경로(`c/005930/`). 링크를 걸어도 되는지 볼 때."""
+        return frozenset(e.path for e in self.companies)
 
     def absolute_url(self, path: str = "") -> str:
         return self.base_url + path.lstrip("/")

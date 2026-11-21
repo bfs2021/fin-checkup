@@ -9,6 +9,7 @@ from datetime import date
 from types import SimpleNamespace
 
 import pytest
+from site_text import unmark
 from test_site_sector import EXTRA_26, HOLDING, seed_group
 
 from fin_checkup.explain import banned
@@ -31,7 +32,7 @@ async def page(tmp_path):
         seed_group(cache)
         target = tmp_path / "out"
         await build_site(cache, target, 2024, built_on=date(2026, 11, 21))
-    return html.unescape((target / "market" / "index.html").read_text(encoding="utf-8"))
+    return unmark(html.unescape((target / "market" / "index.html").read_text(encoding="utf-8")))
 
 
 def card(text: str, key: str) -> str:
@@ -46,7 +47,7 @@ async def test_every_metric_has_formula_thresholds_signal_shares_and_explainer_l
         assert spec.formula in block, spec.key
         assert "경계값" in block
         assert f'href="../m/{spec.key}/"' in block
-        for emoji in "🟢🟡🔴⚪⊘⚫":
+        for emoji in "🟢🟡🔴⚪⊘⚫":  # 화면에선 CSS 모양 — unmark 로 되돌려 본다 (test_site_signal_marks)
             assert emoji in block, (spec.key, emoji)
 
 
@@ -60,7 +61,7 @@ async def test_distribution_and_shares_cover_every_company(page):
     block = card(page, "operating_margin")
     assert f"{len(margins)}곳" in block
     assert f"{statistics.median(margins):,.2f}%" in block
-    shares = dict(re.findall(r"</span> (\S+) [\d.]+% <small>\((\d+)곳\)</small>", block))
+    shares = dict(re.findall(r"[🟢🟡🔴⚪⊘⚫] (\S+) [\d.]+% <small>\((\d+)곳\)</small>", block))
     assert sum(int(n) for n in shares.values()) == TOTAL
 
 

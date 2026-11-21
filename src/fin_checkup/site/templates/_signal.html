@@ -1,0 +1,7 @@
+{#
+  신호 표시 — 이모지 글꼴에 기대지 않는다. ⚪ 가 어떤 글꼴에선 흑백 "○" 로 나와 '비어 있음' 처럼 보였다(2026-11-21 조사).
+  모양은 CSS(.fc-mark.mark-<key>, site.css), 뜻은 늘 글자(신호 이름)로 함께 적는다.
+  피드·JSON·meta 설명 같은 글자만 있는 곳은 이모지를 그대로 쓴다.
+#}
+{% macro mark(key) %}<span class="fc-mark mark-{{ key }}" aria-hidden="true"></span>{% endmacro %}
+{% macro badge(key, label) %}<span class="fc-sig sig-{{ key }}">{{ mark(key) }}{{ label }}</span>{% endmacro %}

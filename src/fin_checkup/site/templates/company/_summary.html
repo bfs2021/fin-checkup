@@ -1,3 +1,4 @@
+{% from "_signal.html" import mark, badge %}
 <header class="fc-summary" id="summary">
   <h1>{{ c.name }} <span class="fc-code">{{ c.stock_code }}</span>{% if c.market %} <span class="fc-code">{{ c.market }}</span>{% endif %}</h1>
   <p class="fc-basis">{{ c.year }}년 {{ c.report_label }} · {{ c.statement_label }} · {{ c.sector_label }} 기준</p>
@@ -6,7 +7,7 @@
   {% endif %}
   <ul class="fc-chips" aria-label="신호 개수">
   {% for chip in c.chips %}
-    <li class="fc-chip sig-{{ chip.signal.key }}"><span aria-hidden="true">{{ chip.signal.emoji }}</span> {{ chip.signal.label }} <b>{{ chip.count }}</b></li>
+    <li class="fc-chip sig-{{ chip.signal.key }}">{{ mark(chip.signal.key) }}{{ chip.signal.label }} <b>{{ chip.count }}</b></li>
   {% endfor %}
   </ul>
   {% if c.sector_notice %}

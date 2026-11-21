@@ -14,7 +14,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Literal
 
-from fin_checkup.metrics.engine import MONEY, Metric
+from fin_checkup.metrics.engine import MONEY, Metric, comparison_base
 from fin_checkup.models import Financials, InterestSource
 
 BALANCE = "재무상태표"
@@ -119,8 +119,9 @@ def result_text(metric: Metric, currency: str = "KRW") -> str:
 
 
 def _prior(history: Sequence[Financials], latest: Financials) -> Financials | None:
-    # service.run 과 같은 규칙 — 바로 앞 사업연도만 '작년' 이다.
-    return next((f for f in history if f.bsns_year == latest.bsns_year - 1), None)
+    # service.run 과 같은 규칙 — 올해 보고서의 전기 열, 없으면 바로 앞 사업연도만 '작년' 이다.
+    previous = next((f for f in history if f.bsns_year == latest.bsns_year - 1), None)
+    return comparison_base(latest, previous)
 
 
 def _label(field: str, fin: Financials) -> str:

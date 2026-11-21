@@ -350,3 +350,19 @@ def test_fcf_combined_capex_basis_is_stated_after_the_band_sentence():
     assert m.signal is Signal.RED
     assert "0 미만이라" in text and "무형자산" in text
     assert banned.find(text) == []
+
+
+def test_profit_to_loss_is_called_a_turn_to_loss_not_a_continued_loss():
+    """흑자 → 적자는 '적자 지속' 이 아니다. 증가율 −150% 옆에 그 사실을 따로 적는다."""
+    m = metric("operating_income_growth", dict(operating_income=-50), dict(operating_income=100))
+    assert m.signal is Signal.RED and m.value == pytest.approx(-150.0)
+    sentence = why_color(m)
+    assert "적자 전환" in sentence
+    assert "적자 지속" not in sentence
+
+
+def test_ordinary_decline_gets_no_turnaround_fact():
+    m = metric("operating_income_growth", dict(operating_income=50), dict(operating_income=100))
+    assert m.signal is Signal.RED
+    sentence = why_color(m)
+    assert "전환" not in sentence and "지속" not in sentence

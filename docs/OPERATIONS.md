@@ -237,7 +237,7 @@ uv run python -m fin_checkup.cli budget
 ```
 로컬 수집 (scripts/collect_universe.py)
   → scripts/publish_snapshot.sh            # 허용목록 테이블 → data-YYYYMMDD 릴리스 (snapshot-*.zip + manifest.json)
-  → .github/workflows/pages.yml            # 릴리스 → 캐시 재구성 → (최근 위험 공시) → site build → site check → 배포
+  → .github/workflows/pages.yml            # 릴리스 → 캐시 재구성 → (최근 위험 공시) → site build → site check → site links → 배포
 ```
 
 ### 스냅샷 올리기
@@ -254,7 +254,15 @@ uv run python -m fin_checkup.cli budget
 - `snapshot import` 로 새 캐시를 만들고 `site build --base-url $SITE_URL` 로 빌드한다.
 - **`site check site-out`** 이 면책·계산식·CSP·외부 스크립트·인증키 패턴을 산출물에서 확인한다(규칙은 `site/guard.py`).
   하나라도 걸리면 배포하지 않는다.
+- **`site links site-out --base-url $SITE_URL`** 이 내부 링크(상대경로·사이트 주소 아래 절대주소·`#앵커`)가 실제 파일로
+  이어지는지 본다(`site/links.py`). 깨진 내부 링크가 있으면 배포하지 않는다. 외부 링크는 목록만 남긴다.
 - 배포는 한 번에 하나(`concurrency: pages`, 진행 중인 배포를 끊지 않는다).
+- 배포 환경 `github-pages` 는 **브랜치 `main` 과 태그 `data-*`** 에서만 배포를 받는다(저장소 Settings → Environments).
+  릴리스로 시작된 실행은 태그 위에서 돌기 때문에, 태그 규칙이 빠지면 build 는 녹색인데 deploy 만 거부된다
+  (2026-11-21 첫 배포가 그렇게 실패했다). 확인: `gh api repos/younghwan91/fin-checkup/environments/github-pages/deployment-branch-policies`.
+- 스냅샷의 지표 값은 배포마다 `cli backfill --years 5` 로 지금 코드 기준으로 다시 계산한다 — 지표 계산을 고친 PR 은
+  스냅샷을 다시 올리지 않아도 다음 배포(매일 07:00 KST)에 반영된다. 회사 페이지가 2,000곳보다 적으면
+  `site check --min-companies` 가 배포를 막는다.
 
 ### secret `DART_API_KEY`
 
@@ -274,6 +282,7 @@ uv run python -m fin_checkup.cli budget
 ```bash
 uv run python -m fin_checkup.cli site build --out site-out --limit 50   # 앞 50곳만 (확인용), 사업연도는 --year
 uv run python -m fin_checkup.cli site check site-out                     # 배포 전과 같은 가드
+uv run python -m fin_checkup.cli site links site-out                     # 깨진 내부 링크
 uv run python -m http.server -d site-out 8080                            # http://localhost:8080/
 ```
 
@@ -285,6 +294,11 @@ uv run python -m http.server -d site-out 8080                            # http:
 - 출력 폴더는 빌드마다 통째로 비운다. 비어 있지 않은 폴더는 빌드 표식(`.fin-checkup-site`)이 있을 때만 비우고,
   없으면 멈춘다 — 엉뚱한 폴더를 지우지 않게.
 - canonical·sitemap 같은 절대주소는 `--base-url https://…` 를 줄 때만 나온다. 페이지 사이 링크는 상대경로라 무관하다.
+- 빠르게: `--jobs N` 은 건강검진 계산을 프로세스 N 개로 나눈다(DB 를 읽기 전용으로 여는 `site build` 에서만).
+  `--incremental <폴더>` 는 코드·데이터가 같은 건강검진과 공유 카드 PNG 를 다시 만들지 않는다 — 열쇠는 패키지
+  소스 전체 해시 + 데이터 테이블 내용 해시(+ PNG 는 카드 내용)라 하나라도 바뀌면 다시 만든다
+  (`site/incremental.py`). 2026-11-21 실측(2,542곳·16코어): 기본 87초 → `--jobs 8` 55초 → 같은 캐시로 다시 9초.
+  `pages.yml` 은 `--jobs $(nproc) --incremental _build-cache` 에 actions/cache 로 폴더를 이어 쓴다.
 
 ### 검색 엔진에 사이트 알리기 (sitemap)
 

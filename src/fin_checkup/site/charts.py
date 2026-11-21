@@ -323,10 +323,15 @@ def years_of(panels: Sequence[TrendPanel]) -> list[int]:
 # ── 동종업계 분포 위 이 회사의 위치 ──────────────────────────────
 
 #: viewBox 크기. 지표 카드 안에 들어가므로 낮고 넓게.
-STRIP_W, STRIP_H = 320, 62
+STRIP_W, STRIP_H = 320, 76
 _STRIP_X0, _STRIP_X1 = 10, 310
 _DIST_Y = 24  # 상자·수염·표식의 가운데 줄
 _BAND_Y = 42  # 경계값 띠
+#: 띠 아래 구간 이름(정상·주의·위험) 줄. 색만으로 구간을 가르지 않게 글자로도 적는다.
+#: 경계값 숫자는 그 아래 줄.
+_BAND_LABEL_Y = 58
+#: 구간 이름을 적을 최소 폭(px). 더 좁으면 뺀다 — 그 구간은 경계값 숫자와 카드의 경계값 문장이 말해 준다.
+BAND_LABEL_MIN_WIDTH = 30
 _LABEL_GAP = 36  # 경계값 글자 사이 최소 간격(px). 더 가까우면 뒤의 것을 뺀다 — 경계값 문장에 이미 있다.
 
 
@@ -430,6 +435,11 @@ def peer_strip(metric: Metric, stat: PeerStat | None, currency: str, chart_id: s
                 f'width="{max(x1 - x0, 0):.1f}" height="4" rx="2">'
                 f"<title>{_esc(signal.emoji)} {_esc(signal.label)} 구간</title></rect>"
             )
+            if x1 - x0 >= BAND_LABEL_MIN_WIDTH:
+                parts.append(
+                    f'<text class="fc-ch-band-label" x="{(x0 + x1) / 2:.1f}" y="{_BAND_LABEL_Y}" '
+                    f'text-anchor="middle">{_esc(signal.label)}</text>'
+                )
         last = -math.inf
         for edge in sorted({band.warn, band.good}):
             ex = x(edge)
@@ -563,10 +573,13 @@ def badge_svg(counts: dict[Signal, int], year: int, company: str = "") -> str:
     for signal, n in badge_counts(counts):
         pieces.append(_badge_dot(signal, x + 4.5, cy, colors))
         x += 9 + 2
-        text = str(n)
+        # 정상·주의·위험 점은 모양이 같고 색만 다르다 — 색을 못 가르는 사람도 읽게 이름을 붙인다.
+        # ⚪·⊘·⚫ 는 점 모양(흰 원·사선 원)과 이름 없는 숫자로 갈린다.
+        text = f"{signal.label} {n}" if signal in _ALWAYS else str(n)
         tw = _badge_text_width(text)
         pieces.append(
-            f'<text x="{x:.1f}" y="14" textLength="{tw:.1f}" lengthAdjust="spacingAndGlyphs">{text}</text>'
+            f'<text x="{x:.1f}" y="14" textLength="{tw:.1f}" lengthAdjust="spacingAndGlyphs">'
+            f"{_esc(text)}</text>"
         )
         x += tw + 6
     tail = f"· DART {year}"

@@ -171,3 +171,21 @@ def classify_all(disclosures: list[Disclosure]) -> list[RiskDisclosure]:
     found = [r for r in (classify(d) for d in disclosures) if r is not None]
     found.sort(key=lambda r: (r.severity.rank, r.disclosure.rcept_dt), reverse=True)
     return found
+
+
+#: 관심종목과 무관하게 '시장 전체' 로 내보내는 최소 강도. 알림 채널(`worker.broadcast`)과
+#: 사이트 첫 화면의 공시 목록(`site/disclosures.py`)이 같은 기준을 쓴다.
+MARKET_WIDE_MIN_SEVERITY = Severity.CRITICAL
+
+
+def is_market_wide(kind: RiskKind) -> bool:
+    """시장 전체 목록에 올리는 유형인가 (부도·회생 등, 관리종목·상장폐지 관련)."""
+    return kind.severity.rank >= MARKET_WIDE_MIN_SEVERITY.rank
+
+
+def same_event_key(corp_code: str, rcept_dt: str, kind: RiskKind) -> tuple[str, str, str]:
+    """한 사건이 여러 공시로 쪼개져 올 때 묶는 열쇠 — 같은 회사·같은 날·같은 종류.
+
+    묶인 것 중에는 접수번호가 가장 빠른 것 하나를 대표로 남긴다 (`worker._collapse_same_event`).
+    """
+    return (corp_code, rcept_dt, kind.value)

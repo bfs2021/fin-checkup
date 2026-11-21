@@ -168,6 +168,13 @@ def _turnaround_rules(noun: str) -> tuple[SpecialRule, ...]:
             f"작년에 이어 올해도 {noun}이 적자면 손실 폭이 줄었든 커졌든 '적자 지속'으로 표시해요.",
             Signal.RED,
             f"작년에 이어 올해도 {noun}이 적자예요(적자 지속).",
+            note_marker="적자가 이어지고",
+        ),
+        SpecialRule(
+            f"작년 {noun}이 흑자였는데 올해 적자면 증가율과 함께 '적자 전환'으로 표시해요.",
+            Signal.RED,
+            f"작년 {noun} 흑자에서 올해 적자로 돌아섰어요(적자 전환).",
+            note_marker="흑자에서 적자로",
         ),
         SpecialRule(
             f"작년 {noun}이 정확히 0이면 증가율을 낼 수 없어 비워 둬요.",

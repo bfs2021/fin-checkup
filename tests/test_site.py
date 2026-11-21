@@ -7,6 +7,7 @@ from datetime import date
 
 import pytest
 from hub_seed import DELISTED, HLB, KB, SAMSUNG, seed_site_cache
+from site_text import unmark
 
 from fin_checkup.cli import main
 from fin_checkup.config import settings
@@ -36,7 +37,7 @@ async def built(cache, tmp_path):
 
 
 def page(out, code: str) -> str:
-    return (out / "c" / code / "index.html").read_text(encoding="utf-8")
+    return unmark((out / "c" / code / "index.html").read_text(encoding="utf-8"))
 
 
 # ── 빌드 ──────────────────────────────────────────────────────────
