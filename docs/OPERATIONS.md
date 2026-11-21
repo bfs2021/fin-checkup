@@ -144,6 +144,19 @@ uv run python -m fin_checkup.cli disclosures fetch --days 7 --out site-data/disc
 이 규칙을 넣으면서 옛 `metric_values` 의 이자보상배율을 지운다(캐시를 쓰기 모드로 열 때 한 번,
 `migrations.metric_values_interest_source`). **`cli backfill` 을 다시 돌려야** 대조군이 채워진다.
 
+미국 기업(`sec/normalize.py`)도 같은 순서다. 2024 택소노미부터 `InterestExpense` 대신
+`InterestExpenseNonoperating` 을 쓰는 회사가 늘어서(frames CY2023 158곳 → CY2024 456곳) 총액 태그에 넣었다.
+
+| 출처 (SEC 태그) | CY2024 frames | 처리 |
+|---|---|---|
+| `InterestExpense` → `InterestExpenseNonoperating` → `InterestExpenseDebt` | 1,869 | 그대로 판정 |
+| `InterestPaidNet` (이자 지급액, 자본화 이자 제외) | 1,841 | 판정 + "이자 지급액 기준" 비고. 0 이면 다음으로 |
+| `InterestIncomeExpenseNet` 음수 (순이자비용) | 41 | 값만 보여 주고 ⚪. 0·양수(순이자수익)는 쓰지 않는다 |
+
+순이자비용은 이자수익만큼 분모가 작아 배율이 **높게만** 틀린다 — 총액과 둘 다 낸 135곳(CY2023)에서
+순액이 총액의 80% 미만인 곳이 24%(p10 13%)였다. 이걸로 🟢 를 매기면 이자 부담을 감춘다.
+SEC 값은 대조군(`metric_values`)에 들어가지 않아 마이그레이션은 없다.
+
 ## 5. 계정과 키
 
 - 비밀번호를 받지 않는다 — 저장·재설정·유출 대응을 떠안지 않기 위해서

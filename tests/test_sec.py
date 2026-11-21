@@ -6,6 +6,8 @@ import respx
 
 from fin_checkup.config import Settings
 from fin_checkup.metrics.engine import checkup
+from fin_checkup.metrics.signals import Signal
+from fin_checkup.models import InterestSource
 from fin_checkup.sec.client import SecClient, SecError
 from fin_checkup.sec.normalize import normalize_company_facts
 
@@ -116,7 +118,12 @@ def test_net_interest_income_is_not_treated_as_interest_expense():
     fin = normalize_company_facts(income, 2023)
     assert fin is not None
     assert fin.interest_expense is None
+    assert fin.interest_expense_source is None
 
+
+def test_net_interest_expense_is_kept_as_a_proxy_not_as_interest_expense():
+    """순이자비용 = 이자비용 − 이자수익. 이자수익만큼 분모가 작아져 배율이 부풀려진다
+    (CY2023 둘 다 공시한 135곳: 순액이 총액의 80% 미만인 곳 24%, p10 13%)."""
     expense = facts(
         Assets=units(entry("2023-09-30", 1)),
         InterestIncomeExpenseNet=units(entry("2023-09-30", -500_000_000, start="2022-10-01")),
@@ -124,8 +131,64 @@ def test_net_interest_income_is_not_treated_as_interest_expense():
     fin = normalize_company_facts(expense, 2023)
     assert fin is not None
     assert fin.interest_expense == 500_000_000
-    assert fin.interest_expense_source is not None
-    assert fin.interest_expense_source.value == "income_statement"
+    assert fin.interest_expense_source is InterestSource.NET_INTEREST
+
+
+def test_zero_net_interest_is_not_read_as_debt_free():
+    # 이자비용 = 이자수익이면 순액이 0 이다. 빚이 없다는 뜻이 아니다 — 🟢 무차입으로 찍으면 안 된다.
+    data = facts(
+        Assets=units(entry("2023-09-30", 1)),
+        InterestIncomeExpenseNet=units(entry("2023-09-30", 0, start="2022-10-01")),
+    )
+    fin = normalize_company_facts(data, 2023)
+    assert fin is not None
+    assert fin.interest_expense is None
+
+
+@pytest.mark.parametrize("tag", ["InterestExpense", "InterestExpenseNonoperating", "InterestExpenseDebt"])
+def test_gross_interest_expense_tags_beat_net(tag):
+    """2024 택소노미부터 InterestExpenseNonoperating 이 늘었다(CY2023 158곳 → CY2024 456곳)."""
+    data = facts(
+        **{tag: units(entry("2023-09-30", 800, start="2022-10-01"))},
+        InterestIncomeExpenseNet=units(entry("2023-09-30", -300, start="2022-10-01")),
+        InterestPaidNet=units(entry("2023-09-30", 700, start="2022-10-01")),
+    )
+    fin = normalize_company_facts(data, 2023)
+    assert fin.interest_expense == 800
+    assert fin.interest_expense_source is InterestSource.INCOME_STATEMENT
+
+
+def test_interest_paid_is_preferred_to_net_interest():
+    data = facts(
+        InterestIncomeExpenseNet=units(entry("2023-09-30", -300, start="2022-10-01")),
+        InterestPaidNet=units(entry("2023-09-30", 700, start="2022-10-01")),
+    )
+    fin = normalize_company_facts(data, 2023)
+    assert fin.interest_expense == 700
+    assert fin.interest_expense_source is InterestSource.CASH_FLOW
+
+
+def test_zero_interest_paid_falls_through_to_net():
+    # 현금 지급 0 은 무차입의 증거가 아니다(DART 와 같은 규칙).
+    data = facts(
+        InterestIncomeExpenseNet=units(entry("2023-09-30", -300, start="2022-10-01")),
+        InterestPaidNet=units(entry("2023-09-30", 0, start="2022-10-01")),
+    )
+    fin = normalize_company_facts(data, 2023)
+    assert fin.interest_expense == 300
+    assert fin.interest_expense_source is InterestSource.NET_INTEREST
+
+
+def test_net_interest_coverage_is_shown_but_not_judged():
+    data = facts(
+        OperatingIncomeLoss=units(entry("2023-09-30", 50, start="2022-10-01")),
+        InterestIncomeExpenseNet=units(entry("2023-09-30", -100, start="2022-10-01")),
+    )
+    m = checkup(normalize_company_facts(data, 2023)).by_key("interest_coverage")
+    assert m.value == pytest.approx(0.5)
+    assert m.signal is Signal.NEUTRAL, "순액으로 🔴 를 내지 않는다"
+    assert m.proxy is True
+    assert "순이자" in m.note and "판정하지 않음" in m.note
 
 
 def test_fiscal_years_ending_in_early_january_belong_to_the_prior_year():

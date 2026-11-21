@@ -127,6 +127,18 @@ def test_zombie_streak_does_not_fire_on_finance_cost_proxy():
     assert "zombie_streak" not in keys(detect_red_flags(history))
 
 
+def test_zombie_streak_does_not_fire_on_net_interest_proxy():
+    # 미국 순이자비용(이자비용 − 이자수익)도 대체값이다. 연속 판정을 거기서 멈춘다.
+    from fin_checkup.models import InterestSource
+
+    history = [
+        fin(y, operating_income=5, interest_expense=100,
+            interest_expense_source=InterestSource.NET_INTEREST)
+        for y in (2022, 2023, 2024)
+    ]
+    assert "zombie_streak" not in keys(detect_red_flags(history))
+
+
 def test_zombie_streak_fires_on_cash_flow_interest_paid():
     from fin_checkup.models import InterestSource
 
