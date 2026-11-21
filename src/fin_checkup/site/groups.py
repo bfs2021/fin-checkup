@@ -89,10 +89,12 @@ class Distribution:
     spec: MetricDef
     #: 분포에 든 회사 수.
     count: int
-    #: 모집단 회사 수. count + 아래 세 가지 = total.
+    #: 모집단 회사 수. count + 아래 네 가지 = total.
     total: int
     #: 값이 없어(⚫) 뺀 회사.
     missing: int
+    #: 값은 없지만 신호는 있는 회사 — 자본잠식처럼 계산할 수 없는 상태 자체로 판정한 경우.
+    judged_without_value: int
     #: 업종에 맞지 않아(⊘) 뺀 회사.
     not_applicable: int
     #: 원화가 아닌 금액이라 뺀 회사.
@@ -115,11 +117,13 @@ class Distribution:
         """분포에서 뺀 회사를 이유별로. 뺀 회사가 없으면 빈 문자열."""
         parts = []
         if self.missing:
-            parts.append(f"값이 없는 ⚫ {self.missing}곳")
+            parts.append(f"값이 없는 ⚫ {self.missing:,}곳")
+        if self.judged_without_value:
+            parts.append(f"값 없이 판정된 {self.judged_without_value:,}곳(자본잠식 등)")
         if self.not_applicable:
-            parts.append(f"업종에 맞지 않는 ⊘ {self.not_applicable}곳")
+            parts.append(f"업종에 맞지 않는 ⊘ {self.not_applicable:,}곳")
         if self.other_currency:
-            parts.append(f"원화가 아닌 금액 {self.other_currency}곳")
+            parts.append(f"원화가 아닌 금액 {self.other_currency:,}곳")
         return ", ".join(parts)
 
     def text(self, value: float | None) -> str:
@@ -134,7 +138,7 @@ class Distribution:
 def distribution(spec: MetricDef, entries: list[CompanyEntry]) -> Distribution:
     values: list[float] = []
     counts: Counter[Signal] = Counter()
-    missing = not_applicable = other_currency = 0
+    missing = judged_without_value = not_applicable = other_currency = 0
     for entry in entries:
         metric = entry.checkup.result.by_key(spec.key)
         if metric is None:
@@ -145,7 +149,10 @@ def distribution(spec: MetricDef, entries: list[CompanyEntry]) -> Distribution:
         if metric.signal is Signal.NOT_APPLICABLE:
             not_applicable += 1
         elif metric.value is None:
-            missing += 1
+            if metric.signal is Signal.UNKNOWN:
+                missing += 1
+            else:
+                judged_without_value += 1
         elif metric.unit == MONEY and entry.checkup.result.currency != "KRW":
             other_currency += 1
         else:
@@ -164,6 +171,7 @@ def distribution(spec: MetricDef, entries: list[CompanyEntry]) -> Distribution:
         count=len(values),
         total=total,
         missing=missing,
+        judged_without_value=judged_without_value,
         not_applicable=not_applicable,
         other_currency=other_currency,
         median=median,

@@ -1,0 +1,34 @@
+{#
+  시장 전체 분포. 값: total, sectors(적용된 판정 기준), blocks(sector.MetricBlock), legend, min_peers.
+  회사 이름·목록을 넣지 않는다 (pages/market.py).
+#}
+{% extends "base.html" %}
+{% block title %}시장 전체 재무 지표 분포 {{ site.year }} · fin-checkup{% endblock %}
+{% block description %}상장사 {{ "{:,}".format(total) }}곳의 {{ site.year }} 사업연도 재무 지표 17개 분포(1사분위·중앙값·3사분위)와 신호별 비율, 계산식·경계값.{% endblock %}
+{% block main %}
+<article class="fc-market">
+  <h1>시장 전체 분포</h1>
+  <p class="fc-lead">이 사이트에 페이지가 있는 상장사 {{ "{:,}".format(total) }}곳의 {{ site.year }} 사업연도 지표를 한데 모았습니다. 회사 하나의 숫자가 시장 전체에서 어디쯤인지 가늠할 때 쓰는 바탕입니다.</p>
+
+  <section class="fc-section" aria-labelledby="read-title">
+    <h2 id="read-title">읽는 법</h2>
+    <ul>
+      <li>가운데 절반의 회사가 <b>1사분위</b>와 <b>3사분위</b> 사이에 있고, <b>중앙값</b>은 한가운데 회사의 값입니다.</li>
+      <li>신호 비율은 회사마다 자기 업종 기준({{ sectors | map(attribute="label") | join("·") }})으로 판정한 결과를 센 것입니다. 그래서 경계값을 기준마다 적었습니다.</li>
+      <li>값이 없는 회사(⚫)와 업종에 맞지 않는 회사(⊘)는 분포에서 빼고 몇 곳인지 적습니다. 0으로 세지 않습니다.</li>
+      <li>업종마다 분포가 크게 다릅니다. 업종별 분포는 <a href="{{ url('s/') }}">업종</a>에서 볼 수 있습니다.</li>
+    </ul>
+    <ul class="fc-shares" aria-label="신호 기호">
+      {% for s in legend %}
+      <li class="sig-{{ s.key }}"><span aria-hidden="true">{{ s.emoji }}</span> {{ s.label }}</li>
+      {% endfor %}
+    </ul>
+  </section>
+
+  <section class="fc-section" id="distribution" aria-labelledby="dist-title">
+    <h2 id="dist-title">지표 17개</h2>
+    <p class="fc-hint">지표 이름을 누르면 그 지표가 무엇인지, 경계값을 왜 그렇게 잡았는지 설명하는 페이지로 갑니다.</p>
+    {% with show_signals=True %}{% include "_distribution.html" %}{% endwith %}
+  </section>
+</article>
+{% endblock %}

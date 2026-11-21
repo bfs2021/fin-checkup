@@ -77,17 +77,23 @@ def member_sectors(entries: list[CompanyEntry]) -> list[Sector]:
     return [s for s in Sector if s in used]
 
 
+def threshold_lines(key: str, sectors: list[Sector]) -> tuple[ThresholdLine, ...]:
+    """기준마다 경계값 한 줄. 문장이 같은 기준은 한 줄로 합친다(라벨 "일반·부동산업").
+
+    기준이 하나뿐이거나 모든 기준의 문장이 같으면 라벨 없이 한 줄.
+    """
+    texts: dict[str, list[str]] = {}
+    for sector in sectors:
+        texts.setdefault(threshold_text(key, sector), []).append(sector.label)
+    if len(texts) == 1:
+        return (ThresholdLine("", next(iter(texts))),)
+    return tuple(ThresholdLine("·".join(labels), text) for text, labels in texts.items())
+
+
 def metric_blocks(entries: list[CompanyEntry], sectors: list[Sector]) -> list[MetricBlock]:
-    """지표마다 분포 + 경계값 문장. 기준이 둘 이상이면 기준마다 한 줄씩 (어느 쪽도 감추지 않는다)."""
-    labelled = len(sectors) > 1
+    """지표마다 분포 + 경계값 문장. 기준이 둘 이상이면 기준마다 (어느 쪽도 감추지 않는다)."""
     return [
-        MetricBlock(
-            dist=d,
-            thresholds=tuple(
-                ThresholdLine(s.label if labelled else "", threshold_text(d.key, s)) for s in sectors
-            ),
-            explainer_path=f"m/{d.key}/",
-        )
+        MetricBlock(dist=d, thresholds=threshold_lines(d.key, sectors), explainer_path=f"m/{d.key}/")
         for d in distributions(entries)
     ]
 
