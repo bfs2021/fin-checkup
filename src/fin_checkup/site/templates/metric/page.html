@@ -88,6 +88,17 @@
   </section>
   {% endif %}
 
+  <section class="fc-section" id="distribution" aria-labelledby="distribution-title">
+    <h2 id="distribution-title">다른 회사들은 어떻게 퍼져 있나요</h2>
+    <p>같은 지표의 분포(1사분위·중앙값·3사분위)를 볼 수 있어요. 순위가 아니라 퍼진 모양이에요.</p>
+    <ul>
+      {% for d in p.dist_links %}
+      <li><a href="{{ url(d.path) }}">{{ d.text }}</a></li>
+      {% endfor %}
+    </ul>
+  </section>
+
   <p><a href="{{ url('m/') }}">지표 17개 모두 보기</a></p>
+  {% include "_next_read.html" %}
 </article>
 {% endblock %}

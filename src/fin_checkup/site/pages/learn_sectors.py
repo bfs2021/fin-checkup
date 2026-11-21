@@ -27,6 +27,7 @@ from fin_checkup.site.groups import peer_groups, sector_path
 from fin_checkup.site.pages.metric import metric_path
 from fin_checkup.site.pages.sector import Caveat, GroupLink, caveats_for
 from fin_checkup.site.registry import Output, page
+from fin_checkup.site.related import next_reads
 
 
 @dataclass(frozen=True)
@@ -85,4 +86,5 @@ def learn_sectors_page(site: Site) -> Iterator[Output]:
         general=GENERAL_READING,
         metric_path=metric_path,
         financial=Sector.FINANCIAL,
+        next_reads=next_reads("learn/sectors/"),
     )

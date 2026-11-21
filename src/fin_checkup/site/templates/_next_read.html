@@ -1,0 +1,14 @@
+{#
+  '다음에 읽어볼 것' — 해설·배우기 페이지 맨 아래. 넘길 값: next_reads(related.NextRead 목록, 2~3개).
+  정적 관계표(site/related.py)에서 온다. 회사 값·방문 기록으로 고르지 않고, 더 불러오지 않는다(끝이 있는 목록).
+#}
+{% if next_reads %}
+<nav class="fc-section fc-next" aria-labelledby="next-title">
+  <h2 id="next-title">다음에 읽어볼 것</h2>
+  <ul>
+    {% for n in next_reads %}
+    <li><a href="{{ url(n.path) }}"><b>{{ n.title }}</b></a> — {{ n.summary }}</li>
+    {% endfor %}
+  </ul>
+</nav>
+{% endif %}
