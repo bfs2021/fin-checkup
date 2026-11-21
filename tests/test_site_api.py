@@ -20,6 +20,7 @@ METRIC_FIELDS = {
     "category",
     "value",
     "unit",
+    "value_text",
     "signal",
     "formula",
     "thresholds",

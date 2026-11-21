@@ -17,6 +17,7 @@ from collections.abc import Iterator
 from typing import Any
 
 from fin_checkup.disclaimer import DISCLAIMER
+from fin_checkup.format import format_metric
 from fin_checkup.metrics.engine import Metric
 from fin_checkup.metrics.peers import PeerStat, SelfDelta
 from fin_checkup.metrics.sector import peer_group_for
@@ -49,6 +50,7 @@ def _peer(stat: PeerStat | None) -> dict[str, Any] | None:
         "scope_label": stat.scope.label,
         "sample_size": stat.sample_size,
         "median": _number(stat.median),
+        "median_text": stat.median_text,
         "percentile": _number(stat.percentile),
         "summary": stat.summary,
     }
@@ -65,7 +67,9 @@ def _delta(delta: SelfDelta | None) -> dict[str, Any] | None:
     }
 
 
-def _metric(metric: Metric, peer: PeerStat | None, delta: SelfDelta | None) -> dict[str, Any]:
+def _metric(
+    metric: Metric, peer: PeerStat | None, delta: SelfDelta | None, currency: str
+) -> dict[str, Any]:
     band = metric.band
     return {
         "key": metric.key,
@@ -73,6 +77,8 @@ def _metric(metric: Metric, peer: PeerStat | None, delta: SelfDelta | None) -> d
         "category": metric.category.value,
         "value": _number(metric.value),
         "unit": metric.unit,
+        # 화면과 같은 표시 문자열 (`format.format_metric`). 값이 없으면 '—'.
+        "value_text": format_metric(metric, currency),
         "signal": _signal(metric.signal),
         "formula": metric.formula,
         "thresholds": None
@@ -114,7 +120,10 @@ def company_json(entry: CompanyEntry, site: Site) -> dict[str, Any]:
         },
         "currency": result.currency,
         "years": [f.bsns_year for f in data.history],
-        "metrics": [_metric(m, data.peers.get(m.key), data.deltas.get(m.key)) for m in result.metrics],
+        "metrics": [
+            _metric(m, data.peers.get(m.key), data.deltas.get(m.key), result.currency)
+            for m in result.metrics
+        ],
         "red_flags": [
             {"key": f.key, "label": f.label, "detail": f.detail, "reference": f.reference}
             for f in data.red_flags

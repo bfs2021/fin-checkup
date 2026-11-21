@@ -1,0 +1,50 @@
+{#
+  비교 페이지. 값: groups(pages/compare.CompareGroup), max_companies.
+  빌드는 지표 줄(이름·계산식)만 쓰고, 회사 칸은 static/compare.js 가 /api/c/<코드>.json 으로 채운다.
+  회사 순서 = 고른 순서, 지표 순서 = 엔진 정의 순서. 값으로 줄 세우거나 칠하지 않는다.
+#}
+{% extends "base.html" %}
+{% block title %}회사 재무 지표 나란히 보기 · fin-checkup{% endblock %}
+{% block description %}상장사 2~{{ max_companies }}곳의 재무 지표 17개를 신호·값·계산식·경계값·동종 중앙값과 함께 나란히 놓아 봅니다. 순위를 매기지 않습니다.{% endblock %}
+{% block main %}
+<article class="fc-compare-page">
+  <h1>나란히 보기</h1>
+  <p class="fc-lead">회사 2~{{ max_companies }}곳의 지표를 한 표에 놓습니다. 회사는 고른 순서대로, 지표는 늘 같은 순서로 보입니다 — 값으로 줄 세우거나 어느 쪽이 낫다고 표시하지 않습니다.</p>
+
+  <form class="fc-search fc-compare-add" role="search" action="{{ url('compare/') }}" method="get" data-fc-pick>
+    <label class="fc-compare-add-label" for="fc-q-compare">회사 더하기 <small>(최대 {{ max_companies }}곳)</small></label>
+    <input id="fc-q-compare" class="fc-search-input" type="search" name="add"
+           placeholder="회사 이름 · 종목코드 · 초성(ㅅㅅㅈㅈ)" autocomplete="off" spellcheck="false"
+           role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="fc-r-compare">
+    <ul class="fc-results" id="fc-r-compare" role="listbox" aria-label="더할 회사" hidden></ul>
+  </form>
+  <p class="fc-compare-status" role="status" aria-live="polite"></p>
+  <noscript><p class="fc-notice">비교 표의 회사 칸은 자바스크립트로 채웁니다. 스크립트 없이는 각 회사 페이지에서 같은 지표를 볼 수 있습니다.</p></noscript>
+
+  <section class="fc-section" aria-labelledby="compare-title">
+    <h2 id="compare-title">지표 17개</h2>
+    <p class="fc-hint">칸마다 신호·값·경계값을 함께 적고, 옆 칸에 그 회사가 속한 대조군(동종업계, 없으면 전체 상장사)의 중앙값을 적습니다. 업종에 맞지 않는 지표(⊘)는 판정하지 않고 대신 볼 것을, 값이 없으면(⚫) 무엇이 없었는지 적습니다. 지표 이름을 누르면 해설로 갑니다.</p>
+    <div class="fc-table-scroll">
+      <table class="fc-compare" id="fc-compare" data-max="{{ max_companies }}">
+        <thead>
+          <tr class="fc-compare-heads"><th scope="col" rowspan="2">지표 · 계산식</th></tr>
+          <tr class="fc-compare-subheads"></tr>
+        </thead>
+        {% for group in groups %}
+        <tbody>
+          <tr class="fc-compare-cat"><th scope="rowgroup" colspan="1">{{ group.category }}</th></tr>
+          {% for row in group.rows %}
+          <tr class="fc-compare-row" data-key="{{ row.key }}">
+            <th scope="row"><a href="{{ url(row.path) }}">{{ row.label }}</a><small class="fc-compare-formula">{{ row.formula }}</small></th>
+          </tr>
+          {% endfor %}
+        </tbody>
+        {% endfor %}
+      </table>
+    </div>
+  </section>
+</article>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url('assets/compare.js') }}" defer></script>
+{% endblock %}

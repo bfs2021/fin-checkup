@@ -352,6 +352,7 @@ h3 { font-size: .9rem; color: var(--ink-muted); margin: 1.2rem 0 .5rem; letter-s
 
 /* ── 관심종목 (watch/index.html · _watch_toggle.html) ─────── */
 
+.fc-nav { display: flex; gap: .8rem; }
 .fc-nav a { color: var(--ink); font-size: .9rem; }
 .fc-watch-status { font-size: .85rem; color: var(--ink-muted); }
 .fc-watch-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .7rem; }
@@ -363,3 +364,27 @@ h3 { font-size: .9rem; color: var(--ink-muted); margin: 1.2rem 0 .5rem; letter-s
 .fc-watch-changes { margin-top: .5rem; padding-top: .5rem; border-top: 1px dashed var(--border); font-size: .9rem; }
 .fc-watch-since { margin: 0 0 .2rem; color: var(--ink-muted); }
 .fc-watch-change-list { margin: .2rem 0 .5rem; padding-left: 1.1rem; }
+
+/* ── 나란히 보기 (/compare/ · static/compare.js) ─────────── */
+
+a.fc-button { display: inline-block; text-decoration: none; }
+.fc-compare-add { max-width: 28rem; margin: .4rem 0; }
+.fc-compare-add-label { display: block; font-weight: 600; margin-bottom: .2rem; }
+.fc-compare-add-label small { color: var(--ink-muted); font-weight: 400; }
+.fc-compare-status { font-size: .9rem; color: var(--ink-muted); min-height: 1.6em; }
+.fc-compare { border-collapse: collapse; font-size: .85rem; font-variant-numeric: tabular-nums; }
+.fc-compare th, .fc-compare td {
+  border-bottom: 1px solid var(--border); padding: .4rem .5rem; text-align: left; vertical-align: top;
+}
+.fc-compare th[scope="row"] { min-width: 10rem; max-width: 14rem; font-weight: 600; }
+.fc-compare small { display: block; color: var(--ink-muted); font-weight: 400; font-size: .76rem; }
+.fc-compare-cat th { background: var(--surface-sunk); color: var(--ink-muted); font-size: .8rem; letter-spacing: .04em; }
+.fc-compare-company { min-width: 14rem; }
+.fc-compare-company a { font-size: .95rem; }
+.fc-compare-remove { margin-top: .3rem; font-size: .8rem; padding: .1rem .6rem; }
+.fc-compare-value { min-width: 9rem; max-width: 16rem; border-left: 3px solid var(--sig, var(--border)); }
+.fc-compare-number { display: block; font-size: 1rem; margin: .15rem 0; }
+.fc-compare .muted { color: var(--ink-muted); }
+.fc-compare-peer { min-width: 6rem; white-space: nowrap; }
+/* 4곳이면 표가 넓다 — 이 페이지만 본문 폭을 넓힌다 (좁은 화면은 표 안에서 가로 스크롤). */
+.fc-wrap:has(> .fc-compare-page) { max-width: 82rem; }

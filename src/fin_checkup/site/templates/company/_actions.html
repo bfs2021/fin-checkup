@@ -1,5 +1,6 @@
-{# 회사 페이지 동작 줄 — 관심종목에 담기 · 링크 공유. #}
+{# 회사 페이지 동작 줄 — 관심종목에 담기 · 나란히 보기에 더하기 · 링크 공유. #}
 <div class="fc-actions" id="actions">
 {% include "company/_watch_toggle.html" %}
+<a class="fc-button" href="{{ url('compare/?add=' ~ c.stock_code) }}">비교에 추가</a>
 {% include "_share.html" %}
 </div>
