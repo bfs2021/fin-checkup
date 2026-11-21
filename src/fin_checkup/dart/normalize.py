@@ -12,7 +12,13 @@ from collections import Counter
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 
-from fin_checkup.models import AccountLine, Financials, InterestSource, RawStatements
+from fin_checkup.models import (
+    AccountLine,
+    Financials,
+    InterestSource,
+    RawStatements,
+    ReceivableSource,
+)
 
 BS = frozenset({"BS"})
 INCOME = frozenset({"IS", "CIS"})
@@ -64,18 +70,7 @@ FIELD_SPECS: tuple[FieldSpec, ...] = (
         account_ids=("ifrs-full_Inventories", "ifrs_Inventories"),
         account_names=("재고자산",),
     ),
-    FieldSpec(
-        "trade_receivables", BS,
-        account_ids=(
-            "ifrs-full_TradeAndOtherCurrentReceivables",
-            "ifrs_TradeAndOtherCurrentReceivables",
-        ),
-        # 실데이터에서 '유동매출채권' 표기가 가장 흔한 누락 원인이었다.
-        account_names=(
-            "매출채권", "유동매출채권", "매출채권및기타유동채권", "매출채권및기타채권",
-            "매출채권및상각후원가측정금융자산", "매출채권및계약자산",
-        ),
-    ),
+    # 매출채권은 순수 줄 → 합계 줄 순서가 필요해 _trade_receivables 가 따로 찾는다.
     FieldSpec(
         "capital_stock", BS,
         account_ids=("ifrs-full_IssuedCapital", "ifrs_IssuedCapital"),
@@ -143,6 +138,37 @@ FIELD_SPECS: tuple[FieldSpec, ...] = (
 )
 
 
+#: 순수 매출채권. 합계 태그(TradeAndOtherCurrentReceivables)보다 먼저 본다 — 합계 태그로
+#: 먼저 잡으면 매출채권 줄이 따로 있어도 합계가, 미수금 묶음에 그 태그를 붙인 회사는
+#: '기타수취채권'이 분모가 됐다(2024 상장사 약 150곳).
+TRADE_RECEIVABLES = FieldSpec(
+    "trade_receivables", BS,
+    account_ids=(
+        "dart_ShortTermTradeReceivable",
+        "ifrs-full_CurrentTradeReceivables",
+        "ifrs-full_TradeReceivables",
+    ),
+    # 실데이터에서 '유동매출채권' 표기가 가장 흔한 누락 원인이었다.
+    account_names=("매출채권", "유동매출채권", "단기매출채권"),
+)
+#: 매출채권및기타채권 합계. 매출채권 단독 줄이 없을 때만 쓰고 출처를 남긴다.
+#: 이 태그만으로는 고르지 않는다 — 이름에 '매출채권'이 든 줄만 후보다(_trade_receivables).
+TRADE_AND_OTHER_RECEIVABLES = FieldSpec(
+    "trade_receivables", BS,
+    account_ids=(
+        "ifrs-full_TradeAndOtherCurrentReceivables",
+        "ifrs_TradeAndOtherCurrentReceivables",
+    ),
+    account_names=(
+        "매출채권및기타유동채권", "매출채권및기타채권", "매출채권및기타수취채권",
+        "매출채권및기타채권(유동)", "유동매출채권및기타채권", "매출채권및수취채권",
+        "매출채권및상각후원가측정금융자산", "매출채권및계약자산",
+    ),
+)
+#: 비유동(장기) 매출채권 줄. 회전율의 분모는 1년 안에 받을 외상값이다.
+_NONCURRENT_IDS = ("Noncurrent", "LongTerm")
+_NONCURRENT_NAMES = ("장기", "비유동")
+
 #: 금융원가 — 이자비용 단독 계정도, 현금흐름표 이자 지급도 없을 때의 마지막 대체값.
 #: 외환·파생 손실이 섞여 이자보다 크다(판정하지 않는다 — metrics.engine).
 FINANCE_COSTS = FieldSpec(
@@ -196,6 +222,24 @@ def _find(lines: Iterable[AccountLine], spec: FieldSpec) -> float | None:
     return None
 
 
+def _trade_receivables(
+    lines: Iterable[AccountLine],
+) -> tuple[float | None, ReceivableSource | None]:
+    """매출채권과 그 출처: 매출채권 단독 줄 → 매출채권및기타채권 합계 줄."""
+    current = [
+        ln for ln in lines
+        if ln.sj_div in BS
+        and not any(word in ln.account_id for word in _NONCURRENT_IDS)
+        and not any(word in _key(ln.account_nm) for word in _NONCURRENT_NAMES)
+    ]
+    if (pure := _find(current, TRADE_RECEIVABLES)) is not None:
+        return pure, ReceivableSource.TRADE
+    aggregates = [ln for ln in current if "매출채권" in _key(ln.account_nm)]
+    if (total := _find(aggregates, TRADE_AND_OTHER_RECEIVABLES)) is not None:
+        return total, ReceivableSource.TRADE_AND_OTHER
+    return None, None
+
+
 def _interest_paid(lines: Iterable[AccountLine]) -> float | None:
     """현금흐름표 이자 지급액(절댓값). 표준 태그 줄은 활동별로 합하고, 없으면 이름으로 한 줄."""
     candidates = [
@@ -243,6 +287,7 @@ def normalize_statements(raw: RawStatements) -> Financials:
     """원본 계정 줄 → 지표 계산용 Financials."""
     values = {spec.name: _find(raw.lines, spec) for spec in FIELD_SPECS}
     values["interest_expense"], source = _interest_expense(raw.lines, values["interest_expense"])
+    values["trade_receivables"], receivable_source = _trade_receivables(raw.lines)
     return Financials(
         corp_code=raw.corp_code,
         bsns_year=raw.bsns_year,
@@ -250,5 +295,6 @@ def normalize_statements(raw: RawStatements) -> Financials:
         fs_div=raw.fs_div,
         currency=_currency_of(raw.lines),
         interest_expense_source=source,
+        trade_receivables_source=receivable_source,
         **values,
     )

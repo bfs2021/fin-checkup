@@ -11,7 +11,7 @@ from fin_checkup.metrics.engine import checkup
 from fin_checkup.metrics.peers import PeerScope, PeerStat, SelfDelta
 from fin_checkup.metrics.sector import Sector
 from fin_checkup.metrics.signals import Signal
-from fin_checkup.models import Financials, FsDiv, InterestSource, ReportCode
+from fin_checkup.models import Financials, FsDiv, InterestSource, ReceivableSource, ReportCode
 
 
 def fin(year: int = 2024, **kwargs) -> Financials:
@@ -325,4 +325,12 @@ def test_net_interest_proxy_gives_its_own_reason_not_the_finance_cost_one():
     assert m.signal is Signal.NEUTRAL
     assert "순이자" in text and "이자수익" in text
     assert "금융원가" not in text, "미국 기업에 금융원가 이유를 대면 거짓이다"
+    assert banned.find(text) == []
+
+
+def test_receivable_aggregate_basis_is_stated_on_a_neutral_metric():
+    m = metric("receivable_turnover", dict(revenue=1000, trade_receivables=250,
+                                           trade_receivables_source=ReceivableSource.TRADE_AND_OTHER))
+    text = why_color(m)
+    assert "⚪ 측정값" in text and "매출채권및기타채권" in text
     assert banned.find(text) == []

@@ -346,6 +346,23 @@ def test_reopening_purges_interest_coverage_computed_from_finance_costs(tmp_path
         assert c.peer_metric_values(["A"], 2024)["interest_coverage"] == [48.0], "한 번만 돈다"
 
 
+def test_reopening_purges_receivable_turnover_computed_from_other_receivables(tmp_path):
+    """옛 규칙은 합계 태그를 먼저 잡아 '기타수취채권' 같은 미수금 줄을 매출채권으로 썼다.
+    그 회전율이 대조군에 남지 않게 다시 열 때 지우고 backfill 로 다시 채운다."""
+    from fin_checkup.storage.db import _MIGRATION_RECEIVABLE_SOURCE
+
+    path = tmp_path / "r.duckdb"
+    with Cache(path) as c:
+        c.conn.execute("DELETE FROM meta WHERE key = ?", [_MIGRATION_RECEIVABLE_SOURCE])
+        c.save_metric_values("A", 2024, {"receivable_turnover": 90.0, "roe": 10.0})
+
+    with Cache(path) as c:
+        values = c.peer_metric_values(["A"], 2024)
+        assert "receivable_turnover" not in values
+        assert values["roe"] == [10.0]
+        assert c.get_meta(_MIGRATION_RECEIVABLE_SOURCE) == "done"
+
+
 def test_listed_population_excludes_unlisted_markets(cache: Cache):
     """종목코드가 남아 있어도 지금 상장돼 있지 않으면(DART corp_cls 'E' → OTHER) 모집단 밖이다.
 

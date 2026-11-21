@@ -206,6 +206,18 @@ def test_interest_coverage_source_note_reaches_the_api(client, cache, api_key):
     assert "금융원가" in ic["note"] and "판정하지 않음" in ic["note"]
 
 
+def test_receivable_aggregate_note_reaches_the_api(client, cache, api_key):
+    """매출채권및기타채권 합계로 나눈 회전율은 그 사실이 응답에 같이 나가야 한다."""
+    raw = statements(SAMSUNG.corp_code, 2024, 1200.0)
+    raw.lines.append(AccountLine(sj_div="BS", account_id="ifrs-full_TradeAndOtherCurrentReceivables",
+                                 account_nm="매출채권및기타채권", thstrm_amount=300.0, ord=7))
+    cache.save_statements(raw)
+    body = client.get("/checkup/005930", params={"year": 2024}, headers=auth(api_key)).json()
+    rt = next(m for m in body["metrics"] if m["key"] == "receivable_turnover")
+    assert rt["value"] == 4.0
+    assert "매출채권및기타채권 합계" in rt["note"]
+
+
 def test_checkup_response_always_carries_the_disclaimer(client, api_key):
     body = client.get("/checkup/005930", headers=auth(api_key)).json()
     assert "투자권유" in body["disclaimer"]

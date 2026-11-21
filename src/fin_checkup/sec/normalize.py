@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Any
 
-from fin_checkup.models import Financials, FsDiv, InterestSource, ReportCode
+from fin_checkup.models import Financials, FsDiv, InterestSource, ReceivableSource, ReportCode
 
 #: 이 일수 이상이어야 연간 값으로 본다. 분기(약 90일)를 걸러내기 위한 것.
 MIN_ANNUAL_DAYS = 300
@@ -45,6 +45,8 @@ TAG_SPECS: tuple[TagSpec, ...] = (
     TagSpec("current_assets", ("AssetsCurrent",), False),
     TagSpec("current_liabilities", ("LiabilitiesCurrent",), False),
     TagSpec("inventories", ("InventoryNet",), False),
+    # 매출채권: AccountsReceivableNetCurrent(순수) → ReceivablesNetCurrent(미수금 포함 합계).
+    # 어느 쪽인지 trade_receivables_source 에 남긴다(아래 RECEIVABLE_TAG_SOURCE).
     TagSpec(
         "trade_receivables",
         ("AccountsReceivableNetCurrent", "ReceivablesNetCurrent"),
@@ -112,6 +114,13 @@ INTEREST_PAID_TAG = "InterestPaidNet"
 #: 절대값으로 쓰고, 그것도 대체값으로만 둔다 — 이자수익만큼 분모가 작아져 배율이 부풀려진다.
 #: frames CY2023 에서 총액과 순액을 함께 낸 135곳 중 순액이 총액의 80% 미만인 곳이 24% 였다.
 NET_INTEREST_TAG = "InterestIncomeExpenseNet"
+
+
+#: 매출채권 태그 → 출처. ReceivablesNetCurrent 는 매출채권 외 채권까지 묶은 합계다.
+RECEIVABLE_TAG_SOURCE = {
+    "AccountsReceivableNetCurrent": ReceivableSource.TRADE,
+    "ReceivablesNetCurrent": ReceivableSource.TRADE_AND_OTHER,
+}
 
 
 def _is_annual_form(entry: dict) -> bool:
@@ -192,10 +201,12 @@ def normalize_company_facts(
         return None
 
     values: dict[str, float | None] = {}
+    matched: dict[str, str] = {}
     for spec in TAG_SPECS:
         picked: float | None = None
         for tag in spec.tags:
             if (picked := _pick_tag(us_gaap, tag, fiscal_year, spec.is_flow)) is not None:
+                matched[spec.field] = tag
                 break
         values[spec.field] = abs(picked) if (picked is not None and spec.absolute) else picked
     values["interest_expense"], source = _interest_expense(us_gaap, fiscal_year, values["interest_expense"])
@@ -212,5 +223,6 @@ def normalize_company_facts(
         fs_div=FsDiv.CFS,
         currency="USD",
         interest_expense_source=source,
+        trade_receivables_source=RECEIVABLE_TAG_SOURCE.get(matched.get("trade_receivables", "")),
         **values,
     )
