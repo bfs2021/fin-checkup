@@ -402,3 +402,25 @@ def check_site(out: Path, sources: bool = True) -> list[Violation]:
     if not pages:
         violations.append(Violation("", "site", "HTML 페이지가 하나도 없다 — 빈 빌드는 통과시키지 않는다"))
     return violations
+
+
+def check_coverage(out: Path, min_companies: int) -> list[Violation]:
+    """회사 페이지가 `min_companies` 곳보다 적으면 위반 — 거의 빈 사이트를 배포하지 않게.
+
+    `--year` 가 데이터에 없는 사업연도를 가리키면(예: 2025 를 아직 수집하지 않았는데 기본값 2025 로
+    빌드) 빌드는 성공하고 다른 가드도 모두 통과한 채 회사 몇 곳짜리 사이트가 나간다. 가장 최근 해가
+    그 몇 곳 덕에 2025 로 보여 신선도 경고도 뜨지 않는다. 0 이면 검사하지 않는다(픽스처 빌드용).
+    """
+    if min_companies <= 0 or not out.is_dir():
+        return []
+    count = sum(1 for p in (out / "c").glob("*/index.html")) if (out / "c").is_dir() else 0
+    if count >= min_companies:
+        return []
+    return [
+        Violation(
+            "c/",
+            "coverage",
+            f"회사 페이지가 {count:,}곳뿐이다 (최소 {min_companies:,}곳)"
+            " — --year 가 데이터에 없는 해인지 확인",
+        )
+    ]
