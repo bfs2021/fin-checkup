@@ -69,7 +69,7 @@
 | R2 | 지난 방문 이후 바뀐 것 | ☐ |
 | R3 | 사업보고서 시즌 안내 · 데이터 기준일 | ☐ |
 | R4 | 회사별 Atom 피드 | ☐ |
-| R5 | OG/트위터 메타 · canonical | ☐ |
+| R5 | OG/트위터 메타 · canonical | ☑ |
 | R6 | sitemap.xml · robots.txt | ☐ |
 | R7 | 링크 복사·공유 (추적 없음) | ☐ |
 
