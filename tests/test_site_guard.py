@@ -55,6 +55,19 @@ def test_fixture_build_passes_every_guard(out):
     assert check_site(out) == []
 
 
+def test_build_with_an_absolute_base_url_passes_every_guard(tmp_path):
+    """Pages 는 `--base-url https://…` 로 빌드한다 — canonical·og:url 이 절대주소가 된다.
+
+    canonical 을 '다른 사이트 자원' 으로 읽으면 실제 배포 빌드의 거의 모든 페이지가 걸린다.
+    """
+    with Cache(tmp_path / "site.duckdb") as cache:
+        seed_site_cache(cache)
+        target = tmp_path / "abs"
+        base = "https://younghwan91.github.io/fin-checkup/"
+        asyncio.run(build_site(cache, target, 2024, base_url=base, built_on=date(2026, 11, 21)))
+    assert check_site(target) == []
+
+
 def test_guard_sees_every_company_metric(out):
     """가드가 지표 카드를 실제로 읽는지 — 경계값을 지우면 걸려야 한다."""
     path = out / "c" / "005930" / "index.html"
@@ -146,6 +159,30 @@ def test_inline_style_needs_csp_permission():
 )
 def test_no_offsite_or_inline_scripts(body):
     assert rules("x.html", page(body)) == ["script"]
+
+
+@pytest.mark.parametrize(
+    "head",
+    [
+        '<link rel="canonical" href="https://example.github.io/fin-checkup/c/005930/">',
+        '<link rel="alternate" type="application/atom+xml" href="https://example.github.io/feed.xml">',
+    ],
+)
+def test_navigation_links_are_not_resource_loads(head):
+    assert rules("x.html", page(head=CSP + head)) == []
+
+
+@pytest.mark.parametrize(
+    "head",
+    [
+        '<link rel="icon" href="https://cdn.example/favicon.ico">',
+        '<link rel="alternate stylesheet" href="https://cdn.example/x.css">',
+        '<link rel="preload" as="font" href="https://cdn.example/f.woff2">',
+        '<link href="https://cdn.example/x.css">',
+    ],
+)
+def test_resource_links_to_other_sites_are_still_blocked(head):
+    assert rules("x.html", page(head=CSP + head)) == ["script"]
 
 
 def test_local_and_data_scripts_are_fine():

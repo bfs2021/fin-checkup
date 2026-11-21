@@ -53,6 +53,11 @@ _LOADERS = {
     "audio": "src",
     "video": "src",
 }
+#: 아무것도 불러오지 않는 `<link rel>` — 주소를 알려 줄 뿐이다(canonical·피드 등).
+#: rel 의 낱말이 전부 여기 있을 때만 통과한다. `alternate stylesheet` 처럼 하나라도 아니면 자원 로드로 본다.
+_NAV_LINK_RELS = frozenset(
+    {"canonical", "alternate", "author", "license", "help", "next", "prev", "search", "me"}
+)
 _OFFSITE = re.compile(r"^\s*(?:[a-zA-Z][a-zA-Z0-9+.-]*:|//)")
 _HEX40 = re.compile(r"(?<![0-9a-fA-F])[0-9a-fA-F]{40}(?![0-9a-fA-F])")
 _STORAGE_BANNED = re.compile(r"document\s*\.\s*cookie|sessionStorage|indexedDB")
@@ -124,6 +129,9 @@ class _PageScan(HTMLParser):
         if tag == "meta" and a.get("http-equiv", "").lower() == "content-security-policy":
             self.csp.append(a.get("content", ""))
         attr = _LOADERS.get(tag)
+        rels = set(a.get("rel", "").lower().split())
+        if tag == "link" and rels and rels <= _NAV_LINK_RELS:
+            attr = None
         if attr and a.get(attr):
             self.loads.append((tag, a[attr]))
         if tag == "script":
