@@ -122,8 +122,10 @@
     }
     var td = el("td", "fc-compare-value sig-" + metric.signal.key);
     var sig = el("span", "fc-sig");
-    sig.appendChild(el("span", "", metric.signal.emoji)).setAttribute("aria-hidden", "true");
-    sig.appendChild(document.createTextNode(" " + metric.signal.label));
+    // 신호 모양은 CSS(.fc-mark) — 이모지 글꼴에 기대지 않는다 (_signal.html 과 같은 모양).
+    sig.className = "fc-sig sig-" + metric.signal.key;
+    sig.appendChild(el("span", "fc-mark mark-" + metric.signal.key)).setAttribute("aria-hidden", "true");
+    sig.appendChild(document.createTextNode(metric.signal.label));
     td.appendChild(sig);
     td.appendChild(el("b", "fc-compare-number" + (metric.value == null ? " muted" : ""), metric.value_text));
     td.appendChild(el("small", "", "경계값 " + metric.threshold_text));

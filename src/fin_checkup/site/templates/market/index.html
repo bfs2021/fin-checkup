@@ -3,6 +3,7 @@
   회사 이름·목록을 넣지 않는다 (pages/market.py).
 #}
 {% extends "base.html" %}
+{% from "_signal.html" import mark, badge %}
 {% block title %}시장 전체 재무 지표 분포 {{ site.year }} · fin-checkup{% endblock %}
 {% block description %}상장사 {{ "{:,}".format(total) }}곳의 {{ site.year }} 사업연도 재무 지표 17개 분포(1사분위·중앙값·3사분위)와 신호별 비율, 계산식·경계값.{% endblock %}
 {% block main %}
@@ -15,12 +16,12 @@
     <ul>
       <li>가운데 절반의 회사가 <b>1사분위</b>와 <b>3사분위</b> 사이에 있고, <b>중앙값</b>은 한가운데 회사의 값입니다.</li>
       <li>신호 비율은 회사마다 자기 업종 기준({{ sectors | map(attribute="label") | join("·") }})으로 판정한 결과를 센 것입니다. 그래서 경계값을 기준마다 적었습니다.</li>
-      <li>값이 없는 회사(⚫)와 업종에 맞지 않는 회사(⊘)는 분포에서 빼고 몇 곳인지 적습니다. 0으로 세지 않습니다.</li>
+      <li>값이 없는 회사({{ mark("unknown") }}데이터 없음)와 업종에 맞지 않는 회사({{ mark("not_applicable") }}해당 없음)는 분포에서 빼고 몇 곳인지 적습니다. 0으로 세지 않습니다.</li>
       <li>업종마다 분포가 크게 다릅니다. 업종별 분포는 <a href="{{ url('s/') }}">업종</a>에서 볼 수 있습니다.</li>
     </ul>
     <ul class="fc-shares" aria-label="신호 기호">
       {% for s in legend %}
-      <li class="sig-{{ s.key }}"><span aria-hidden="true">{{ s.emoji }}</span> {{ s.label }}</li>
+      <li class="sig-{{ s.key }}">{{ mark(s.key) }}{{ s.label }} <small class="fc-sig-glyph">(글자로는 {{ s.emoji }})</small></li>
       {% endfor %}
     </ul>
   </section>

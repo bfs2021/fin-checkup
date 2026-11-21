@@ -8,6 +8,7 @@ from datetime import date
 
 import pytest
 from hub_seed import DELISTED, HLB, KB, NO_DATA, SAMSUNG, UNLISTED, seed_site_cache, statements
+from site_text import unmark
 
 from fin_checkup.explain import banned
 from fin_checkup.explain.metrics import explainers, get_explainer, threshold_text
@@ -57,7 +58,7 @@ async def out(tmp_path):
 
 
 def read(out, *parts) -> str:
-    return html.unescape(out.joinpath(*parts).read_text(encoding="utf-8"))
+    return unmark(html.unescape(out.joinpath(*parts).read_text(encoding="utf-8")))
 
 
 def section(text: str, ident: str) -> str:
@@ -102,7 +103,7 @@ async def test_special_rules_show_symbol_and_label(out):
     text = section(read(out, "m", "interest_coverage", "index.html"), "formula")
     for rule in get_explainer("interest_coverage").special_rules:
         assert rule.when in text
-        assert f"{rule.signal.emoji}</span> {rule.signal.label}" in text
+        assert f"{rule.signal.emoji} {rule.signal.label}" in text
 
 
 async def test_example_is_the_largest_revenue_general_company_for_every_metric(out):

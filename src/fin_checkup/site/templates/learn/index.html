@@ -2,6 +2,7 @@
   배우기 허브 `/learn/`. 넘길 값: legend(learn.LegendItem 목록), guides(learn.Guide 목록 — 읽는 차례).
 #}
 {% extends "base.html" %}
+{% from "_signal.html" import mark, badge %}
 {% block title %}처음 오셨나요 — 신호등 읽는 법과 가이드 · fin-checkup{% endblock %}
 {% block description %}재무 신호등 🟢🟡🔴⚪⊘⚫ 읽는 법, 재무제표 처음 읽기, 지표 17개 해설, 위험 신호·위험 공시 유형, 용어집.{% endblock %}
 {% block main %}
@@ -22,7 +23,7 @@
     <h2 id="legend-title">신호등 읽는 법</h2>
     <ul class="fc-legend">
       {% for s in legend %}
-      <li class="fc-chip sig-{{ s.signal.key }}"><span aria-hidden="true">{{ s.signal.emoji }}</span> <b>{{ s.signal.label }}</b> — {{ s.meaning }}</li>
+      <li class="fc-chip sig-{{ s.signal.key }}">{{ mark(s.signal.key) }}<b>{{ s.signal.label }}</b> — {{ s.meaning }} <small class="fc-sig-glyph">(알림·피드 글자로는 {{ s.signal.emoji }})</small></li>
       {% endfor %}
     </ul>
     <p>색만 보지 않으셔도 돼요. 모든 신호에는 기호와 글자가 함께 붙고, 지표마다 계산식과 경계값이 적혀 있어요.</p>

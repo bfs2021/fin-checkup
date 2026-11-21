@@ -1,5 +1,6 @@
+{% from "_signal.html" import mark, badge %}
 <footer class="fc-section fc-footnote" id="footnote">
   <p>데이터: 금융감독원 전자공시시스템(DART) {{ c.year }}년 {{ c.report_label }} · {{ c.statement_label }} · 사이트 빌드 {{ site.built_on.isoformat() }}</p>
-  <p>계산에 쓴 사업연도: {{ c.years | join(", ") }}. 공시에서 찾지 못한 계정은 0으로 채우지 않고 ⚫(데이터 없음)로 둡니다.</p>
+  <p>계산에 쓴 사업연도: {{ c.years | join(", ") }}. 공시에서 찾지 못한 계정은 0으로 채우지 않고 {{ mark("unknown") }}데이터 없음으로 둡니다.</p>
   <p>이 페이지는 측정 결과입니다. 면책 문구는 페이지 맨 아래에 있습니다.</p>
 </footer>

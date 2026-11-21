@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pytest
 from hub_seed import seed_site_cache
+from site_text import unmark
 
 from fin_checkup.explain import banned
 from fin_checkup.explain.disclosures import HOW_TO_READ_ON_DART, disclosure_explainers
@@ -32,7 +33,7 @@ async def out(tmp_path):
 
 
 def read(out: Path, page: str) -> str:
-    return html.unescape((out / page / "index.html").read_text(encoding="utf-8"))
+    return unmark(html.unescape((out / page / "index.html").read_text(encoding="utf-8")))
 
 
 def body_text(text: str) -> str:

@@ -3,6 +3,7 @@
   general, metric_path, financial. 업종이 좋다·나쁘다를 말하지 않는다 — 자가 다르다는 것까지.
 #}
 {% extends "base.html" %}
+{% from "_signal.html" import mark, badge %}
 {% block title %}업종별 읽는 법 — 은행·보험·지주회사는 왜 ⊘ 인가 · fin-checkup{% endblock %}
 {% block description %}은행·보험·증권·금융지주와 부동산 회사에는 왜 일부 재무 지표로 판정하지 않는지(⊘), 그 대신 무엇을 보는지, 지주회사는 어떻게 가르는지.{% endblock %}
 {% block main %}
@@ -10,12 +11,12 @@
   <p class="fc-basis"><a href="{{ url('learn/') }}">배우기</a></p>
   <h1>업종별 읽는 법</h1>
   {% for line in why %}
-  <p{% if loop.first %} class="fc-lead"{% endif %}>{{ line }}</p>
+  <p{% if loop.first %} class="fc-lead"{% endif %}>{{ line | marks }}</p>
   {% endfor %}
 
   <section class="fc-section" id="how" aria-labelledby="how-title">
     <h2 id="how-title">업종은 어떻게 정하나요</h2>
-    <p>{{ how }}</p>
+    <p>{{ how | marks }}</p>
     <p>업종 비교(분포·중앙값)는 이와 별개로 업종코드 앞 두 자리 묶음으로 해요. 묶음마다의 분포는 <a href="{{ url('s/') }}">업종 목록</a>에서 볼 수 있어요.</p>
   </section>
 
@@ -23,27 +24,27 @@
   {% set sector = b.reading.sector %}
   <section class="fc-section" id="{{ sector.value }}" aria-labelledby="{{ sector.value }}-title">
     <h2 id="{{ sector.value }}-title">{{ sector.label }}</h2>
-    <p><b>어떤 회사인가요</b> — {{ b.reading.who }}</p>
+    <p><b>어떤 회사인가요</b> — {{ b.reading.who | marks }}</p>
     <h3>왜 숫자가 다르게 생겼나요</h3>
     <ul>
       {% for line in b.reading.why_different %}
-      <li>{{ line }}</li>
+      <li>{{ line | marks }}</li>
       {% endfor %}
     </ul>
 
-    <h3>판정하지 않는 지표 <span aria-hidden="true">⊘</span> {{ b.caveats | length }}개와 대신 볼 것</h3>
+    <h3>판정하지 않는 지표 {{ mark("not_applicable") }}{{ b.caveats | length }}개와 대신 볼 것</h3>
     <ul class="fc-caveats">
       {% for cv in b.caveats %}
-      <li class="sig-not_applicable"><b><span aria-hidden="true">⊘</span> <a href="{{ url(metric_path(cv.key)) }}">{{ cv.label }}</a></b> — {{ cv.why }}<br><small><b>대신 볼 것</b> {{ cv.instead }}</small></li>
+      <li class="sig-not_applicable"><b>{{ mark("not_applicable") }}<span class="fc-visually-hidden">해당 없음 </span><a href="{{ url(metric_path(cv.key)) }}">{{ cv.label }}</a></b> — {{ cv.why | marks }}<br><small><b>대신 볼 것</b> {{ cv.instead | marks }}</small></li>
       {% endfor %}
     </ul>
-    {% if b.reading.where_else %}<p class="fc-hint">{{ b.reading.where_else }}</p>{% endif %}
+    {% if b.reading.where_else %}<p class="fc-hint">{{ b.reading.where_else | marks }}</p>{% endif %}
 
     {% if b.own_bands %}
     <h3>{{ sector.label }} 경계값을 따로 쓰는 지표</h3>
     <dl class="fc-basis-list">
       {% for ob in b.own_bands %}
-      <dt><a href="{{ url(ob.path) }}">{{ ob.label }}</a></dt><dd>{{ ob.text }}</dd>
+      <dt><a href="{{ url(ob.path) }}">{{ ob.label }}</a></dt><dd>{{ ob.text | marks }}</dd>
       {% endfor %}
     </dl>
     {% endif %}
@@ -64,7 +65,7 @@
   <section class="fc-section" id="holding" aria-labelledby="holding-title">
     <h2 id="holding-title">지주회사</h2>
     {% for line in holding %}
-    <p>{{ line }}</p>
+    <p>{{ line | marks }}</p>
     {% endfor %}
     {% if holding_group %}
     <p>지주회사는 <a href="{{ url(holding_group.path) }}">{{ holding_group.info.name }}(KSIC {{ holding_group.info.code }}) 업종 페이지</a>에 함께 들어 있어요. 회사마다 어느 기준으로 판정했는지는 회사 페이지 맨 위에 "… 기준"으로 적혀 있어요.</p>
@@ -74,7 +75,7 @@
   <section class="fc-section" id="general" aria-labelledby="general-title">
     <h2 id="general-title">일반 기준 안에서도</h2>
     {% for line in general %}
-    <p>{{ line }}</p>
+    <p>{{ line | marks }}</p>
     {% endfor %}
   </section>
   {% include "_next_read.html" %}

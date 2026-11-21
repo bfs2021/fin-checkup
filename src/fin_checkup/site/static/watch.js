@@ -311,9 +311,19 @@
     return disclosuresLoad;
   }
 
-  function signalText(key) {
+  // 신호 모양은 CSS(.fc-mark) — 이모지 글꼴에 기대지 않는다 (_signal.html 과 같은 모양).
+  function signalMark(key) {
+    var mark = el("span", "fc-mark mark-" + key);
+    mark.setAttribute("aria-hidden", "true");
+    return mark;
+  }
+
+  function signalBadge(key) {
     var s = SIGNALS[key] || { emoji: "", label: key };
-    return s.emoji + " " + s.label;
+    var badge = el("span", "fc-sig sig-" + key);
+    badge.appendChild(signalMark(key));
+    badge.appendChild(document.createTextNode(s.label));
+    return badge;
   }
 
   function changeLine(change, code) {
@@ -329,7 +339,10 @@
       var a = el("a", null, change.label);
       a.href = root + "c/" + code + "/#m-" + change.key;
       li.appendChild(a);
-      li.appendChild(document.createTextNode(": " + signalText(change.from) + " → " + signalText(change.to)));
+      li.appendChild(document.createTextNode(": "));
+      li.appendChild(signalBadge(change.from));
+      li.appendChild(document.createTextNode(" → "));
+      li.appendChild(signalBadge(change.to));
     } else {
       li.appendChild(document.createTextNode(
         "위험 공시 " + change.date + " · " + change.category + " — " + change.title + " "
@@ -384,9 +397,7 @@
     chipCounts(company).forEach(function (pair) {
       var sig = SIGNALS[pair[0]];
       var li = el("li", "fc-chip sig-" + pair[0]);
-      var mark = el("span", null, sig.emoji + " ");
-      mark.setAttribute("aria-hidden", "true");
-      li.appendChild(mark);
+      li.appendChild(signalMark(pair[0]));
       li.appendChild(document.createTextNode(sig.label + " "));
       li.appendChild(el("b", null, String(pair[1])));
       list.appendChild(li);
