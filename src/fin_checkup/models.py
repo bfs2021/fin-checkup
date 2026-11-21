@@ -158,6 +158,9 @@ class InterestSource(str, Enum):
     CASH_FLOW = "cash_flow"
     #: 금융원가·금융비용. 이자 말고도 섞여 있어 판정하지 않는 대체값이다.
     FINANCE_COSTS = "finance_costs"
+    #: SEC 순이자비용(InterestIncomeExpenseNet, 이자비용 − 이자수익). 이자수익만큼 작아
+    #: 배율이 부풀려지는 대체값이다 — 판정하지 않는다.
+    NET_INTEREST = "net_interest"
 
     @property
     def label(self) -> str:
@@ -165,7 +168,13 @@ class InterestSource(str, Enum):
             "income_statement": "손익계산서 이자비용",
             "cash_flow": "현금흐름표 이자의 지급",
             "finance_costs": "금융원가(대체값)",
+            "net_interest": "순이자비용(대체값)",
         }[self.value]
+
+    @property
+    def is_proxy(self) -> bool:
+        """이자비용 그 자체가 아니라 다른 것이 섞인 값인가 (값만 보여 주고 판정하지 않는다)."""
+        return self in (InterestSource.FINANCE_COSTS, InterestSource.NET_INTEREST)
 
 
 class Financials(BaseModel):

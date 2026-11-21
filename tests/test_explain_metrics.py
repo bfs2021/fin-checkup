@@ -150,6 +150,8 @@ SPECIAL_CASES = [
     ("interest_coverage", dict(operating_income=10, interest_expense=0), None, Signal.GREEN),
     ("interest_coverage", dict(operating_income=10, interest_expense=4,
                                interest_expense_source=InterestSource.FINANCE_COSTS), None, Signal.NEUTRAL),
+    ("interest_coverage", dict(operating_income=10, interest_expense=4,
+                               interest_expense_source=InterestSource.NET_INTEREST), None, Signal.NEUTRAL),
     ("revenue_growth", dict(revenue=100), dict(revenue=0), Signal.UNKNOWN),
     ("operating_income_growth", dict(operating_income=10), dict(operating_income=-5), Signal.GREEN),
     ("operating_income_growth", dict(operating_income=-3), dict(operating_income=-5), Signal.RED),

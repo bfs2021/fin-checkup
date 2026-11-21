@@ -316,3 +316,13 @@ def test_cash_flow_source_is_stated_when_red():
     text = why_color(m)
     assert m.signal is Signal.RED
     assert "1배 미만이라" in text and "현금흐름표의 이자 지급액 기준" in text
+
+
+def test_net_interest_proxy_gives_its_own_reason_not_the_finance_cost_one():
+    m = metric("interest_coverage", dict(operating_income=50, interest_expense=100,
+                                         interest_expense_source=InterestSource.NET_INTEREST))
+    text = why_color(m)
+    assert m.signal is Signal.NEUTRAL
+    assert "순이자" in text and "이자수익" in text
+    assert "금융원가" not in text, "미국 기업에 금융원가 이유를 대면 거짓이다"
+    assert banned.find(text) == []

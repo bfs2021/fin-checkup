@@ -63,9 +63,12 @@ TAG_SPECS: tuple[TagSpec, ...] = (
     ),
     TagSpec("operating_income", ("OperatingIncomeLoss",), True),
     TagSpec("net_income", ("NetIncomeLoss", "ProfitLoss"), True),
+    # 이자비용은 총액 태그만 여기서 찾는다. 없을 때의 대체 순서는 _interest_expense 가 맡는다.
+    # InterestExpenseNonoperating 은 2024 택소노미부터 InterestExpense 를 대신해 늘었다
+    # (frames CY2023 158곳 → CY2024 456곳, 같은 기간 InterestExpense 3,612 → 1,341).
     TagSpec(
         "interest_expense",
-        ("InterestExpense", "InterestExpenseDebt", "InterestIncomeExpenseNet"),
+        ("InterestExpense", "InterestExpenseNonoperating", "InterestExpenseDebt"),
         True,
         absolute=True,
     ),
@@ -103,9 +106,12 @@ def _parse_date(value: Any) -> date | None:
         return None
 
 
-#: "수익(비용) 순액" 태그. 양수면 순수익, 음수면 순비용이다. 비용 자리에 쓸 때는
-#: 음수일 때만 절대값으로 채택한다 — 양수를 abs() 하면 이자수익이 이자비용으로 둔갑한다.
-NET_SIGNED_TAGS = frozenset({"InterestIncomeExpenseNet"})
+#: 현금흐름표 보충 공시의 이자 지급액(자본화 이자 제외). DART 의 '이자의 지급' 에 해당한다.
+INTEREST_PAID_TAG = "InterestPaidNet"
+#: 순이자(이자수익 − 이자비용). 양수면 순수익, 음수면 순비용이다. 비용 자리에는 음수일 때만
+#: 절대값으로 쓰고, 그것도 대체값으로만 둔다 — 이자수익만큼 분모가 작아져 배율이 부풀려진다.
+#: frames CY2023 에서 총액과 순액을 함께 낸 135곳 중 순액이 총액의 80% 미만인 곳이 24% 였다.
+NET_INTEREST_TAG = "InterestIncomeExpenseNet"
 
 
 def _is_annual_form(entry: dict) -> bool:
@@ -148,6 +154,30 @@ def _pick(units: list[dict], fiscal_year: int, is_flow: bool) -> float | None:
     return float(candidates[-1]["val"])
 
 
+def _pick_tag(us_gaap: dict, tag: str, fiscal_year: int, is_flow: bool) -> float | None:
+    units = us_gaap.get(tag, {}).get("units", {}).get("USD")
+    return _pick(units, fiscal_year, is_flow) if units else None
+
+
+def _interest_expense(
+    us_gaap: dict, fiscal_year: int, gross: float | None
+) -> tuple[float | None, InterestSource | None]:
+    """이자비용과 그 출처: 총액 태그 → 이자 지급액(InterestPaidNet) → 순이자비용(대체값).
+
+    DART 와 같은 순서다. 지급 0 은 무차입의 증거가 아니라 다음으로 내려가고, 순액 0 은
+    '이자비용 = 이자수익' 이라 이자가 없다는 뜻이 아니어서 쓰지 않는다.
+    """
+    if gross is not None:
+        return gross, InterestSource.INCOME_STATEMENT
+    paid = _pick_tag(us_gaap, INTEREST_PAID_TAG, fiscal_year, True)
+    if paid is not None and paid != 0:
+        return abs(paid), InterestSource.CASH_FLOW
+    net = _pick_tag(us_gaap, NET_INTEREST_TAG, fiscal_year, True)
+    if net is not None and net < 0:
+        return -net, InterestSource.NET_INTEREST
+    return None, None
+
+
 def normalize_company_facts(
     facts: dict,
     fiscal_year: int,
@@ -165,16 +195,10 @@ def normalize_company_facts(
     for spec in TAG_SPECS:
         picked: float | None = None
         for tag in spec.tags:
-            units = us_gaap.get(tag, {}).get("units", {}).get("USD")
-            if not units:
-                continue
-            picked = _pick(units, fiscal_year, spec.is_flow)
-            if tag in NET_SIGNED_TAGS and picked is not None and picked > 0:
-                # 순액 태그는 양수면 수익이다. 비용으로 바꿔 쓰면 뜻이 뒤집힌다.
-                picked = None
-            if picked is not None:
+            if (picked := _pick_tag(us_gaap, tag, fiscal_year, spec.is_flow)) is not None:
                 break
         values[spec.field] = abs(picked) if (picked is not None and spec.absolute) else picked
+    values["interest_expense"], source = _interest_expense(us_gaap, fiscal_year, values["interest_expense"])
 
     if all(v is None for v in values.values()):
         return None
@@ -187,9 +211,6 @@ def normalize_company_facts(
         reprt_code=ReportCode.ANNUAL,
         fs_div=FsDiv.CFS,
         currency="USD",
-        # 10-K 의 이자비용 태그는 손익계산서 계정이다(DART 처럼 금융원가로 떨어지는 길이 없다).
-        interest_expense_source=(
-            InterestSource.INCOME_STATEMENT if values.get("interest_expense") is not None else None
-        ),
+        interest_expense_source=source,
         **values,
     )

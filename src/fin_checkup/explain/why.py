@@ -60,7 +60,8 @@ def why_color(
 
     if metric.proxy:
         # 경계값은 있는데 분모가 대체값이라 판정하지 않았다. '업종 편차' 문장을 쓰면 이유가 거짓이 된다.
-        rule = next((r for r in explainer.special_rules if r.signal is Signal.NEUTRAL), None)
+        # 대체값이 여럿이다(금융원가·순이자비용). 엔진 메모로 어느 규칙인지 고른다.
+        rule = next((r for r in explainer.special_rules if r.matches(Signal.NEUTRAL, metric.note)), None)
         reason = rule.fact if rule else metric.note
         return f"{name} {topic(value)} {signal.emoji} {is_(signal.label)} — {reason}"
 

@@ -219,11 +219,22 @@ FINANCE_COSTS_PROXY_NOTE = (
     "이자비용 단독 계정이 없어 금융원가(외환손실 등 포함)로 계산 — "
     "실제보다 낮게 나올 수 있어 판정하지 않음."
 )
+#: SEC 에 총액 이자비용도 이자 지급액도 없고 순이자비용만 있을 때. 순액 ≤ 총액이라 배율은
+#: 실제보다 높게만 틀린다(frames CY2023 135곳: 순액이 총액의 80% 미만 24%).
+NET_INTEREST_PROXY_NOTE = (
+    "이자비용 총액이 없어 순이자비용(이자수익 차감)으로 계산 — "
+    "실제보다 높게 나올 수 있어 판정하지 않음."
+)
+_PROXY_NOTES = {
+    InterestSource.FINANCE_COSTS: FINANCE_COSTS_PROXY_NOTE,
+    InterestSource.NET_INTEREST: NET_INTEREST_PROXY_NOTE,
+}
 
 
 def _interest_is_proxy(cur: Financials) -> bool:
-    """금융원가 대체값으로 낸 배율인가. 금융원가 0 은 '이자도 0' 이라 대체가 아니다."""
-    return cur.interest_expense_source is InterestSource.FINANCE_COSTS and bool(cur.interest_expense)
+    """대체값(금융원가·순이자비용)으로 낸 배율인가. 금융원가 0 은 '이자도 0' 이라 대체가 아니다."""
+    source = cur.interest_expense_source
+    return source is not None and source.is_proxy and bool(cur.interest_expense)
 
 
 def _interest_coverage(cur: Financials, _prior: Financials | None) -> tuple[float | None, str]:
@@ -246,7 +257,8 @@ def _interest_coverage_override(
         return None
     if _interest_is_proxy(cur):
         # 외환·파생 손실이 분모에 섞였다. 삼성전자 2024 가 이 값으로 2.52배 🟡 였다(이자 지급 기준 48배).
-        return Signal.NEUTRAL, FINANCE_COSTS_PROXY_NOTE
+        # 미국 순이자비용은 반대로 이자수익이 빠져 분모가 작다.
+        return Signal.NEUTRAL, _PROXY_NOTES[cur.interest_expense_source]
     if value < 1:
         note = "영업이익으로 이자비용을 다 갚지 못하는 상태다."
         if cur.interest_expense_source is InterestSource.CASH_FLOW:
