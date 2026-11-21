@@ -1,0 +1,42 @@
+# 정적 JSON
+
+사이트 빌드가 회사 페이지와 같은 값을 JSON 으로도 낸다. 서버가 없는 정적 파일이라 키·호출 제한이 없다.
+경로는 사이트 루트 기준이다(GitHub Pages 프로젝트 사이트면 `/fin-checkup/` 아래).
+
+**측정값이다.** 투자권유·자문이 아니며, 모든 파일에 `disclaimer` 가 들어 있다 — 다시 보여 줄 땐 함께 보여 준다.
+
+## `api/index.json`
+
+| 필드 | 뜻 |
+|---|---|
+| `schema_version` | 스키마 판. 필드를 빼거나 뜻을 바꿀 때만 오른다 (더하는 건 그대로) |
+| `disclaimer` · `built_on` · `fiscal_year` | 면책 문구 · 빌드 날짜(KST) · 데이터 사업연도 |
+| `companies[]` | `stock_code` · `name` · `market` · `json`(회사 파일 경로) · `page`(회사 페이지 경로), 종목코드순 |
+
+## `api/c/<종목코드>.json`
+
+| 필드 | 뜻 |
+|---|---|
+| `schema_version` · `disclaimer` · `built_on` · `fiscal_year` | 위와 같다 |
+| `company` | `name` · `stock_code` · `corp_code` · `market` · `industry_code`(KSIC) · `peer_group`(KSIC 앞 두 자리, 업종 비교 단위) · `sector`(`general`·`financial`·`real_estate`) · `sector_label` · `page` |
+| `report` | `reprt_code`(`11011`=사업보고서) · `label` · `fs_div`(`CFS` 연결 / `OFS` 개별) |
+| `currency` · `years` | 금액 통화 · 계산에 쓴 사업연도들 |
+| `metrics[]` | 지표 17개, 엔진 정의 순서 (아래) |
+| `red_flags[]` | 재무제표로 확인된 위험 신호 `key` · `label` · `detail` · `reference`. 없으면 빈 배열 |
+| `sources[]` | 출처. OpenDART 요청은 `url` + `params` 로 적는다 — 인증키(`crtfc_key`)는 싣지 않는다 |
+
+`metrics[]` 한 항목:
+
+| 필드 | 뜻 |
+|---|---|
+| `key` · `label` · `category` | 지표 키(`debt_ratio` …) · 이름 · 묶음(수익성·안정성 …) |
+| `value` · `unit` | 값과 단위(`%`·`배`·`money`). 금액(`money`)의 통화는 `currency`. **값이 없으면 `null`** — 0 으로 채우지 않는다 |
+| `signal` | `key`(`green`·`yellow`·`red`·`neutral`·`not_applicable`·`unknown`) · `emoji`(🟢🟡🔴⚪⊘⚫) · `label` |
+| `formula` | 계산식 |
+| `thresholds` | `good` · `warn` · `higher_is_better`. 절대 기준이 없거나(⚪) 업종에 맞지 않으면(⊘) `null` |
+| `threshold_text` | 경계값을 한 줄로 (화면과 같은 문장) |
+| `note` | ⊘ 면 대신 볼 것, ⚫ 면 무엇이 없었는지, 그 밖의 판정 메모 |
+| `peer` | 대조군 분포 `scope`(`industry` 동종업계 / `market` 전체 상장사) · `sample_size` · `median` · `percentile`(0~100, 높을수록 그 지표 기준으로 나은 쪽) · `summary`. 표본이 5개사 미만이면 `null` |
+| `delta` | 작년 대비 `previous` · `current` · `improved`(같으면 `null`) · `summary`. 작년 값이 없거나 ⊘ 면 `null` |
+
+판정 규칙·경계값의 근거는 `src/fin_checkup/metrics/engine.py`, 생성 코드는 `src/fin_checkup/site/pages/api.py`.
