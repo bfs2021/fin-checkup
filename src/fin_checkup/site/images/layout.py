@@ -237,6 +237,18 @@ class Canvas:
         items = self.texts + [("", b) for b in self.shapes]
         return [(t, b) for t, b in items if not b.inside(inner)]
 
+    def collisions(self, tolerance: float = 1.0) -> list[tuple[str, str]]:
+        """서로 겹친 글자 쌍 — 본문이 바닥글을 덮거나 줄이 포개진 경우."""
+        found = []
+        items = [(t, b) for t, b in self.texts if t.strip()]
+        for i, (ta, a) in enumerate(items):
+            for tb, b in items[i + 1 :]:
+                dx = min(a.x1, b.x1) - max(a.x0, b.x0)
+                dy = min(a.y1, b.y1) - max(a.y0, b.y0)
+                if dx > tolerance and dy > tolerance:
+                    found.append((ta, tb))
+        return found
+
     # ── 신호 개수 알약 ───────────────────────────────────
 
     #: (글자, 숫자, 안쪽 여백, 기호 반지름) — 큰 것부터 대 보고 한 줄에 드는 첫 크기.
