@@ -161,6 +161,8 @@ h3 { font-size: .9rem; color: var(--ink-muted); margin: 1.2rem 0 .5rem; letter-s
 .fc-lead { color: var(--ink-muted); margin: 0 0 1.2rem; }
 .fc-landing .fc-search-input { font-size: 1.1rem; padding: .8rem 1rem; }
 .fc-landing-links { margin: 1rem 0 .4rem; }
+.fc-resume { margin: .2rem 0 .6rem; }
+.fc-resume a { margin-left: .4rem; }
 .fc-asof { font-size: .85rem; color: var(--ink-muted); font-variant-numeric: tabular-nums; }
 .fc-not-found-links { margin: 1.2rem 0 0; padding-left: 1.1rem; display: grid; gap: .3rem; }
 

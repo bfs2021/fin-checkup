@@ -226,6 +226,9 @@
       notes.push("최대 " + MAX + "곳까지 놓을 수 있어 " + adding + " 을(를) 더하지 못했습니다. 한 곳을 빼고 다시 더하세요.");
     }
     wanted = addCode(base, adding);
+  } else if (!params.has("c")) {
+    // 메뉴로 들어오면(주소에 ?c= 없음) 지난번 고른 회사를 그대로 — 빈 목록으로 저장소를 지우지 않는다.
+    wanted = stored();
   }
   show(wanted);
 })();
