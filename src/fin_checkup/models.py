@@ -195,6 +195,29 @@ class ReceivableSource(str, Enum):
         return {"trade": "매출채권", "trade_and_other": "매출채권및기타채권 합계"}[self.value]
 
 
+class CapexSource(str, Enum):
+    """설비투자(`Financials.capex`)를 어느 줄에서 가져왔나.
+
+    지표 공식은 '영업활동현금흐름 − 유형자산 취득' 이다. 2024 상장사 2,542곳 중 205곳은 유형자산
+    취득을 종류별(토지·건물·기계장치·기타유형자산…)로만 적고, 몇 곳은 유형·무형 합계 한 줄로 적는다.
+    """
+
+    #: 유형자산의 취득 합계 줄.
+    PPE = "ppe"
+    #: 합계 줄이 없어 종류별 취득 줄을 더한 값.
+    PPE_ITEMIZED = "ppe_itemized"
+    #: 유형자산과 무형자산 취득을 묶은 한 줄. 무형자산 취득만큼 크다.
+    PPE_AND_INTANGIBLE = "ppe_and_intangible"
+
+    @property
+    def label(self) -> str:
+        return {
+            "ppe": "유형자산의 취득",
+            "ppe_itemized": "유형자산 종류별 취득의 합",
+            "ppe_and_intangible": "유형·무형자산 취득 합계",
+        }[self.value]
+
+
 class Financials(BaseModel):
     """지표 계산에 필요한 계정만 정규화한 결과.
 
@@ -232,6 +255,8 @@ class Financials(BaseModel):
     # 현금흐름표
     operating_cash_flow: float | None = None
     capex: float | None = None
+    #: capex 의 출처. 값이 없으면 None.
+    capex_source: CapexSource | None = None
 
     @property
     def free_cash_flow(self) -> float | None:

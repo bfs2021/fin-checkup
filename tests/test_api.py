@@ -218,6 +218,24 @@ def test_receivable_aggregate_note_reaches_the_api(client, cache, api_key):
     assert "매출채권및기타채권 합계" in rt["note"]
 
 
+def test_itemized_capex_note_reaches_the_api(client, cache, api_key):
+    """종류별 유형자산 취득을 더한 설비투자는 그 사실이 FCF 비고로 나가야 한다."""
+    raw = statements(SAMSUNG.corp_code, 2024, 1200.0)
+    raw.lines += [
+        AccountLine(sj_div="CF", account_id="ifrs-full_CashFlowsFromUsedInOperatingActivities",
+                    account_nm="영업활동현금흐름", thstrm_amount=500.0, ord=8),
+        AccountLine(sj_div="CF", account_id="dart_PurchaseOfMachinery",
+                    account_nm="기계장치의 취득", thstrm_amount=-150.0, ord=9),
+        AccountLine(sj_div="CF", account_id="dart_PurchaseOfOtherPropertyPlantAndEquipment",
+                    account_nm="기타유형자산의 취득", thstrm_amount=-50.0, ord=10),
+    ]
+    cache.save_statements(raw)
+    body = client.get("/checkup/005930", params={"year": 2024}, headers=auth(api_key)).json()
+    fcf = next(m for m in body["metrics"] if m["key"] == "fcf")
+    assert fcf["value"] == 300.0
+    assert "종류별 취득" in fcf["note"]
+
+
 def test_checkup_response_always_carries_the_disclaimer(client, api_key):
     body = client.get("/checkup/005930", headers=auth(api_key)).json()
     assert "투자권유" in body["disclaimer"]

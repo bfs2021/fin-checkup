@@ -11,7 +11,14 @@ from fin_checkup.metrics.engine import checkup
 from fin_checkup.metrics.peers import PeerScope, PeerStat, SelfDelta
 from fin_checkup.metrics.sector import Sector
 from fin_checkup.metrics.signals import Signal
-from fin_checkup.models import Financials, FsDiv, InterestSource, ReceivableSource, ReportCode
+from fin_checkup.models import (
+    CapexSource,
+    Financials,
+    FsDiv,
+    InterestSource,
+    ReceivableSource,
+    ReportCode,
+)
 
 
 def fin(year: int = 2024, **kwargs) -> Financials:
@@ -333,4 +340,13 @@ def test_receivable_aggregate_basis_is_stated_on_a_neutral_metric():
                                            trade_receivables_source=ReceivableSource.TRADE_AND_OTHER))
     text = why_color(m)
     assert "⚪ 측정값" in text and "매출채권및기타채권" in text
+    assert banned.find(text) == []
+
+
+def test_fcf_combined_capex_basis_is_stated_after_the_band_sentence():
+    m = metric("fcf", dict(operating_cash_flow=-10e8, capex=5e8,
+                           capex_source=CapexSource.PPE_AND_INTANGIBLE))
+    text = why_color(m)
+    assert m.signal is Signal.RED
+    assert "0 미만이라" in text and "무형자산" in text
     assert banned.find(text) == []

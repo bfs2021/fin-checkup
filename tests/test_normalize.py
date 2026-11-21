@@ -3,6 +3,7 @@ from __future__ import annotations
 from fin_checkup.dart.normalize import normalize_statements
 from fin_checkup.models import (
     AccountLine,
+    CapexSource,
     FsDiv,
     InterestSource,
     RawStatements,
@@ -179,6 +180,86 @@ def test_capex_sign_is_normalized_to_positive_outflow():
     )
     assert fin.capex == 200.0
     assert fin.free_cash_flow == 300.0
+
+
+# ── 설비투자: 유형자산 취득 합계 → 종류별 합 → 유·무형 합계 ─────────────
+# 2024 상장사 205곳은 유형자산 취득을 종류별(토지·건물·기계장치·기타유형자산…)로만 적는다.
+# 옛 규칙은 그중 '기타유형자산의취득' 한 줄을 설비투자로 썼다(56곳).
+
+PPE_ID = "ifrs-full_PurchaseOfPropertyPlantAndEquipmentClassifiedAsInvestingActivities"
+
+
+def test_ppe_total_line_is_capex():
+    fin = normalize_statements(raw(line("CF", PPE_ID, "유형자산의 취득", -200.0)))
+    assert fin.capex == 200.0
+    assert fin.capex_source is CapexSource.PPE
+
+
+def test_itemized_ppe_purchases_are_summed_not_one_class():
+    fin = normalize_statements(raw(
+        line("CF", "dart_PurchaseOfLand", "토지의 취득", -50.0),
+        line("CF", "dart_PurchaseOfMachinery", "기계장치의 취득", -120.0),
+        line("CF", "dart_PurchaseOfOtherPropertyPlantAndEquipment", "기타유형자산의 취득", -30.0),
+        line("CF", "-표준계정코드 미사용-", "공구와기구의 취득", -5.0),
+        line("CF", "dart_PurchaseOfShortTermFinancialInstruments", "단기금융상품의 취득", -999.0),
+    ))
+    assert fin.capex == 205.0, "옛 규칙은 기타유형자산 30 만 썼다"
+    assert fin.capex_source is CapexSource.PPE_ITEMIZED
+
+
+def test_component_tagged_with_the_total_id_is_summed_with_the_other_classes():
+    # 회사가 '시설장치의 취득' 한 줄에 유형자산 합계 태그를 붙이고 나머지는 종류별 태그로 적었다.
+    fin = normalize_statements(raw(
+        line("CF", PPE_ID, "시설장치의 취득", -10.0),
+        line("CF", "dart_PurchaseOfVehicles", "차량운반구의 취득", -40.0),
+    ))
+    assert fin.capex == 50.0
+    assert fin.capex_source is CapexSource.PPE_ITEMIZED
+
+
+def test_right_of_use_assets_are_not_capex():
+    # 사용권자산 '취득' 은 리스 계약이지 현금 설비투자가 아니다.
+    fin = normalize_statements(raw(
+        line("CF", "dart_PurchaseOfMachinery", "기계장치의 취득", -100.0),
+        line("CF", "dart_PurchaseOfOtherPropertyPlantAndEquipment", "사용권자산의 취득", -70.0),
+    ))
+    assert fin.capex == 100.0
+
+    total = normalize_statements(raw(line("CF", PPE_ID, "유형자산 및 사용권자산의 취득", -240.0)))
+    assert total.capex == 240.0, "합계 줄에 사용권자산이 붙어 있어도 설비투자 줄이다"
+    assert total.capex_source is CapexSource.PPE
+
+
+def test_combined_ppe_and_intangible_line_is_kept_with_its_source():
+    fin = normalize_statements(raw(line("CF", PPE_ID, "유ㆍ무형자산의 취득", -300.0)))
+    assert fin.capex == 300.0
+    assert fin.capex_source is CapexSource.PPE_AND_INTANGIBLE
+
+    by_name = normalize_statements(
+        raw(line("CF", "-표준계정코드 미사용-", "유형자산 및 무형자산의 취득", -300.0))
+    )
+    assert by_name.capex_source is CapexSource.PPE_AND_INTANGIBLE
+
+    advance = normalize_statements(raw(line("CF", "x", "선급금의 증가(유형자산및무형자산취득)", -9.0)))
+    assert advance.capex is None, "운전자본 줄은 설비투자가 아니다"
+
+
+def test_ppe_total_beats_the_combined_line():
+    fin = normalize_statements(raw(
+        line("CF", "-표준계정코드 미사용-", "유무형자산의 취득", -300.0),
+        line("CF", PPE_ID, "유형자산의 취득", -200.0),
+    ))
+    assert fin.capex == 200.0
+    assert fin.capex_source is CapexSource.PPE
+
+
+def test_no_ppe_line_leaves_capex_empty():
+    fin = normalize_statements(raw(
+        line("CF", "ifrs-full_PurchaseOfIntangibleAssetsClassifiedAsInvestingActivities",
+             "무형자산의 취득", -9.0),
+    ))
+    assert fin.capex is None
+    assert fin.capex_source is None
 
 
 def test_interest_expense_prefers_explicit_over_finance_cost():

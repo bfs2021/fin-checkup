@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 
 from fin_checkup.models import (
     AccountLine,
+    CapexSource,
     Financials,
     InterestSource,
     RawStatements,
@@ -123,19 +124,36 @@ FIELD_SPECS: tuple[FieldSpec, ...] = (
             "영업활동으로인한순현금흐름",
         ),
     ),
-    FieldSpec(
-        "capex", CF,
-        account_ids=(
-            "ifrs-full_PurchaseOfPropertyPlantAndEquipmentClassifiedAsInvestingActivities",
-        ),
-        # '처분이익 조정' 같은 간접법 조정 항목은 CapEx가 아니다. 완전일치라 걸리지 않는다.
-        account_names=(
-            "유형자산의취득", "유형자산취득", "유형자산의증가",
-            "기타유형자산의취득", "유형자산및무형자산의취득", "설비투자",
-        ),
-        absolute=True,
-    ),
+    # 설비투자는 합계 줄 → 종류별 합 → 유·무형 합계 순서가 필요해 _capex 가 따로 찾는다.
 )
+
+
+#: 유형자산 취득 합계 태그. 회사가 종류 한 줄('시설장치의 취득')에 붙이기도 해서 이름도 본다.
+PPE_PURCHASE_ID = "ifrs-full_PurchaseOfPropertyPlantAndEquipmentClassifiedAsInvestingActivities"
+#: 합계 줄의 이름(공백·앞 번호 제거 뒤 완전일치). '처분이익 조정' 같은 간접법 조정 항목은 CapEx가
+#: 아니다 — 완전일치라 걸리지 않는다.
+PPE_TOTAL_NAMES: tuple[str, ...] = (
+    "유형자산의취득", "유형자산취득", "유형자산의증가", "투자활동으로분류된유형자산의취득", "설비투자",
+)
+#: 유형자산 종류별 취득 태그. 합계 줄이 없을 때 더한다(2024 상장사 205곳). 옛 규칙은 이 중
+#: '기타유형자산의취득' 한 줄만 설비투자로 써서 56곳의 설비투자가 일부만 잡혔다.
+PPE_CLASS_IDS = frozenset({
+    "dart_PurchaseOfLand", "dart_PurchaseOfBuildings", "dart_PurchaseOfStructure",
+    "dart_PurchaseOfMachinery", "dart_PurchaseOfVehicles", "dart_PurchaseOfMotorVehicles",
+    "dart_PurchaseOfShips", "dart_PurchaseOfConstructionInProgress",
+    "dart_PurchaseOfOtherPropertyPlantAndEquipment", "dart_PurchaseOfOfficeEquipment",
+    "dart_PurchaseOfFixturesAndFittings",
+})
+#: 표준 태그 없이 적힌 종류별 취득 줄의 이름.
+PPE_CLASS_NAMES = frozenset({
+    "토지의취득", "건물의취득", "구축물의취득", "기계장치의취득", "차량운반구의취득",
+    "건설중인자산의취득", "기타유형자산의취득", "비품의취득", "사무용비품의취득", "집기의취득",
+    "공구와기구의취득", "공구기구의취득", "시설장치의취득",
+})
+#: 처분은 유입이다. 사용권자산 '취득' 한 줄은 리스 계약이지 현금 설비투자가 아니다 — 다만
+#: '유형자산 및 사용권자산의 취득'(롯데하이마트) 같은 합계 줄은 설비투자 줄이라 앞머리로만 거른다.
+_NOT_CAPEX = ("처분",)
+_NOT_CAPEX_PREFIX = ("사용권",)
 
 
 #: 순수 매출채권. 합계 태그(TradeAndOtherCurrentReceivables)보다 먼저 본다 — 합계 태그로
@@ -240,6 +258,46 @@ def _trade_receivables(
     return None, None
 
 
+def _capex(lines: Iterable[AccountLine]) -> tuple[float | None, CapexSource | None]:
+    """설비투자(절댓값)와 그 출처: 유형자산 취득 합계 → 종류별 취득의 합 → 유·무형 합계.
+
+    합계 줄과 종류별 줄을 함께 적은 회사(2024 29곳)는 합계만 쓴다 — 종류별 줄이 합계의
+    내역인지 별도 항목인지 공시만으로는 가를 수 없다(셋 중 하나꼴로 합이 합계와 같았다).
+    """
+    totals: list[AccountLine] = []
+    classes: list[AccountLine] = []
+    combined: list[AccountLine] = []
+    for ln in lines:
+        if ln.sj_div not in CF or ln.thstrm_amount is None:
+            continue
+        name = _NUMBERING.sub("", _key(ln.account_nm))
+        if any(word in name for word in _NOT_CAPEX) or name.startswith(_NOT_CAPEX_PREFIX):
+            continue
+        if "무형" in name:
+            # '유ㆍ무형자산의 취득' 은 합계 태그를 달고 나와도 무형자산이 섞였다. 유(형)으로 시작하는
+            # 줄만 — '선급금의 증가(유형자산및무형자산취득)' 같은 운전자본 줄은 설비투자가 아니다.
+            if name.startswith("유") and ("취득" in name or "증가" in name):
+                combined.append(ln)
+            continue
+        if ln.account_id == PPE_PURCHASE_ID or name in PPE_TOTAL_NAMES:
+            # 합계 태그를 단 종류 한 줄('시설장치의 취득', '기타유형자산의 취득')은 종류별 줄이다.
+            if name in PPE_TOTAL_NAMES or ("유형자산" in name and not name.startswith("기타유형자산")):
+                totals.append(ln)
+            else:
+                classes.append(ln)
+        elif ln.account_id in PPE_CLASS_IDS or name in PPE_CLASS_NAMES:
+            classes.append(ln)
+    if totals:
+        # 태그 줄이 이름 줄보다 먼저다(옛 FieldSpec 순서).
+        best = next((ln for ln in totals if ln.account_id == PPE_PURCHASE_ID), totals[0])
+        return abs(best.thstrm_amount), CapexSource.PPE  # type: ignore[arg-type]
+    if classes:
+        return sum(abs(ln.thstrm_amount) for ln in classes), CapexSource.PPE_ITEMIZED  # type: ignore[arg-type,misc]
+    if combined:
+        return abs(combined[0].thstrm_amount), CapexSource.PPE_AND_INTANGIBLE  # type: ignore[arg-type]
+    return None, None
+
+
 def _interest_paid(lines: Iterable[AccountLine]) -> float | None:
     """현금흐름표 이자 지급액(절댓값). 표준 태그 줄은 활동별로 합하고, 없으면 이름으로 한 줄."""
     candidates = [
@@ -288,6 +346,7 @@ def normalize_statements(raw: RawStatements) -> Financials:
     values = {spec.name: _find(raw.lines, spec) for spec in FIELD_SPECS}
     values["interest_expense"], source = _interest_expense(raw.lines, values["interest_expense"])
     values["trade_receivables"], receivable_source = _trade_receivables(raw.lines)
+    values["capex"], capex_source = _capex(raw.lines)
     return Financials(
         corp_code=raw.corp_code,
         bsns_year=raw.bsns_year,
@@ -296,5 +355,6 @@ def normalize_statements(raw: RawStatements) -> Financials:
         currency=_currency_of(raw.lines),
         interest_expense_source=source,
         trade_receivables_source=receivable_source,
+        capex_source=capex_source,
         **values,
     )
