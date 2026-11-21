@@ -257,6 +257,12 @@ uv run python -m fin_checkup.cli budget
 - **`site links site-out --base-url $SITE_URL`** 이 내부 링크(상대경로·사이트 주소 아래 절대주소·`#앵커`)가 실제 파일로
   이어지는지 본다(`site/links.py`). 깨진 내부 링크가 있으면 배포하지 않는다. 외부 링크는 목록만 남긴다.
 - 배포는 한 번에 하나(`concurrency: pages`, 진행 중인 배포를 끊지 않는다).
+- 배포 환경 `github-pages` 는 **브랜치 `main` 과 태그 `data-*`** 에서만 배포를 받는다(저장소 Settings → Environments).
+  릴리스로 시작된 실행은 태그 위에서 돌기 때문에, 태그 규칙이 빠지면 build 는 녹색인데 deploy 만 거부된다
+  (2026-11-21 첫 배포가 그렇게 실패했다). 확인: `gh api repos/younghwan91/fin-checkup/environments/github-pages/deployment-branch-policies`.
+- 스냅샷의 지표 값은 배포마다 `cli backfill --years 5` 로 지금 코드 기준으로 다시 계산한다 — 지표 계산을 고친 PR 은
+  스냅샷을 다시 올리지 않아도 다음 배포(매일 07:00 KST)에 반영된다. 회사 페이지가 2,000곳보다 적으면
+  `site check --min-companies` 가 배포를 막는다.
 
 ### secret `DART_API_KEY`
 
