@@ -122,6 +122,19 @@ h3 { font-size: .9rem; color: var(--ink-muted); margin: 1.2rem 0 .5rem; letter-s
   padding: .55rem .75rem;
 }
 .fc-search-input::placeholder { color: var(--ink-muted); }
+.fc-results {
+  position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 5;
+  list-style: none; margin: 0; padding: .25rem;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .12);
+}
+.fc-results[hidden] { display: none; }
+.fc-results a {
+  display: flex; justify-content: space-between; gap: .8rem;
+  padding: .5rem .6rem; border-radius: 6px; color: var(--ink); text-decoration: none;
+}
+.fc-results small { color: var(--ink-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.fc-results [aria-selected="true"] a, .fc-results a:hover { background: var(--surface-sunk); }
 
 /* ── 랜딩 ─────────────────────────────────────────────── */
 
