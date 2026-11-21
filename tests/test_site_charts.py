@@ -9,13 +9,17 @@ from datetime import date
 import pytest
 from hub_seed import KB, SAMSUNG, seed_site_cache
 
-from fin_checkup.metrics.engine import MONEY
+from fin_checkup.metrics.engine import MONEY, Category, Metric
+from fin_checkup.metrics.peers import PeerScope, PeerStat, peer_stats
+from fin_checkup.metrics.signals import Band, Signal
 from fin_checkup.site.build import build_site, collect_companies
 from fin_checkup.site.charts import (
     Gap,
     TrendPoint,
     TrendSeries,
     nice_ticks,
+    peer_strip,
+    peer_strips,
     trend_series,
     trend_svg,
 )
@@ -194,3 +198,130 @@ async def test_company_page_has_trend_section_with_table_fallback(cache, tmp_pat
     assert "⚫ 데이터 없음" in html
     kb = (out / "c" / KB.stock_code / "index.html").read_text(encoding="utf-8")
     assert kb.count('class="fc-ch fc-ch-trend"') == 5  # 금융지주: 부채비율·유동비율 ⊘ 은 그리지 않는다
+
+
+# ── 동종업계 분포 ─────────────────────────────────────────────────
+
+
+MARGIN_BAND = Band(good=7, warn=0)
+
+
+def metric(key="operating_margin", value=12.0, signal=Signal.GREEN, band=MARGIN_BAND, unit="%"):
+    return Metric(
+        key=key,
+        label="영업이익률",
+        category=Category.PROFITABILITY,
+        value=value,
+        unit=unit,
+        signal=signal,
+        description="",
+        formula="영업이익 ÷ 매출액 × 100",
+        band=band,
+    )
+
+
+def stat(scope=PeerScope.INDUSTRY, n=34, **kw):
+    values = dict(median=4.0, p10=-3.0, q1=1.0, q3=8.0, p90=15.0) | kw
+    return PeerStat("operating_margin", sample_size=n, scope=scope, unit="%", percentile=91.0, **values)
+
+
+def test_peer_quartiles_are_computed_with_the_median():
+    values = [float(v) for v in range(1, 21)]  # 1..20
+    s = peer_stats(metric(value=10.0), values)
+    assert s.median == 10.5
+    assert s.q1 == pytest.approx(5.75) and s.q3 == pytest.approx(15.25)
+    assert s.p10 == pytest.approx(2.9) and s.p90 == pytest.approx(18.1)
+
+
+def test_peer_strip_is_labelled_as_a_distribution_not_a_rank():
+    strip = peer_strip(metric(), stat(), "KRW", "p")
+    assert strip.title == "동종업계 34개사 분포"
+    text = str(strip.svg) + strip.spread_text + strip.value_text
+    for ranking in ("상위", "하위", "등", "순위", "최상위", "91"):
+        assert ranking not in text, ranking
+    assert "가운데 50% 1% ~ 8%" in strip.spread_text and "중앙값 4%" in strip.spread_text
+    market = peer_strip(metric(), stat(scope=PeerScope.MARKET, n=880), "KRW", "p")
+    assert market.title == "전체 상장사 880개사 분포"
+
+
+def test_peer_strip_structure_box_median_marker_and_engine_bands():
+    root = parse(peer_strip(metric(), stat(), "KRW", "p").svg)
+    assert root.get("role") == "img" and root.find(f"{SVG}desc") is not None
+    assert root.find(f".//{SVG}rect[@class='fc-ch-box']") is not None
+    assert root.find(f".//{SVG}line[@class='fc-ch-median']") is not None
+    assert root.find(f".//{SVG}circle[@class='fc-ch-marker']") is not None
+    bands = [r.get("class") for r in root.iter(f"{SVG}rect") if "fc-ch-band" in r.get("class")]
+    assert bands == ["fc-ch-band sig-red", "fc-ch-band sig-yellow", "fc-ch-band sig-green"]
+    ticks = [t.text for t in root.iter(f"{SVG}text") if t.get("class") == "fc-ch-tick"]
+    assert ticks == ["0%", "7%"], "경계값은 engine 의 Band 그대로"
+
+
+def test_lower_is_better_bands_run_green_to_red():
+    m = metric("debt_ratio", 80.0, band=Band(good=100, warn=200, higher_is_better=False))
+    root = parse(peer_strip(m, stat(median=120.0, p10=30.0, q1=70.0, q3=180.0, p90=400.0), "KRW", "p").svg)
+    bands = [r.get("class").split()[-1] for r in root.iter(f"{SVG}rect") if "fc-ch-band" in r.get("class")]
+    assert bands == ["sig-green", "sig-yellow", "sig-red"]
+
+
+def test_neutral_metric_has_distribution_but_no_bands():
+    m = metric("asset_turnover", 0.8, signal=Signal.NEUTRAL, band=None, unit="회")
+    strip = peer_strip(m, stat(median=0.7, p10=0.2, q1=0.5, q3=1.0, p90=1.5), "KRW", "p")
+    assert not strip.has_band
+    assert "fc-ch-band" not in str(strip.svg)
+
+
+@pytest.mark.parametrize("signal", [Signal.NOT_APPLICABLE, Signal.UNKNOWN])
+def test_peer_strip_is_hidden_for_not_applicable_and_missing(signal):
+    assert peer_strip(metric(signal=signal), stat(), "KRW", "p") is None
+    assert peer_strip(metric(value=None, signal=Signal.UNKNOWN), stat(), "KRW", "p") is None
+    assert peer_strip(metric(), None, "KRW", "p") is None
+    assert peer_strip(metric(), stat(q1=None), "KRW", "p") is None
+
+
+def test_far_outlier_is_pinned_to_the_edge_not_squashing_the_distribution():
+    root = parse(peer_strip(metric(value=900.0), stat(), "KRW", "p").svg)
+    assert root.find(f".//{SVG}circle[@class='fc-ch-marker']") is None
+    marker = root.find(f".//{SVG}path[@class='fc-ch-marker']")
+    assert marker is not None
+    box = root.find(f".//{SVG}rect[@class='fc-ch-box']")
+    assert float(box.get("width")) > 30, "분포 상자가 한 점으로 짜부라지지 않는다"
+    assert "이 회사 900%" in root.find(f".//{SVG}g[@class='fc-ch-mine']/{SVG}title").text
+
+
+def test_money_metric_strip_uses_korean_units():
+    m = metric("fcf", 3.2e11, band=Band(good=0, warn=0), unit=MONEY)
+    s = stat(median=1e10, p10=-5e10, q1=-1e9, q3=8e10, p90=4e11)
+    strip = peer_strip(m, s, "KRW", "p")
+    assert "억원" in strip.spread_text and strip.value_text == "이 회사 3,200억원"
+    root = parse(strip.svg)
+    bands = [r.get("class").split()[-1] for r in root.iter(f"{SVG}rect") if "fc-ch-band" in r.get("class")]
+    assert bands == ["sig-red", "sig-green"], "good == warn 이면 주의 구간은 폭 0 이라 그리지 않는다"
+
+
+async def test_peer_strips_skip_metrics_without_peers_or_judgement(checkups):
+    data = checkups[KB.stock_code]
+    peers = {m.key: stat() for m in data.result.metrics}
+    strips = peer_strips(dataclasses.replace(data, peers=peers))
+    na = {m.key for m in data.result.metrics if m.signal in (Signal.NOT_APPLICABLE, Signal.UNKNOWN)}
+    assert na and not (na & set(strips))
+    assert set(strips) == {m.key for m in data.result.metrics} - na
+    assert peer_strips(dataclasses.replace(data, peers={})) == {}
+
+
+async def test_metric_card_renders_the_strip_inside_it(checkups):
+    from fin_checkup.site.render import make_env
+
+    data = checkups[SAMSUNG.stock_code]
+    strips = peer_strips(dataclasses.replace(data, peers={"operating_margin": stat()}))
+    html = (
+        make_env()
+        .get_template("company/_peer_strip.html")
+        .render(m=type("M", (), {"key": "operating_margin"}), peer_strips=strips)
+    )
+    assert "동종업계 34개사 분포" in html and "<svg" in html and "&lt;svg" not in html
+    empty = (
+        make_env()
+        .get_template("company/_peer_strip.html")
+        .render(m=type("M", (), {"key": "roe"}), peer_strips=strips)
+    )
+    assert empty.strip() == ""

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fin_checkup.site.charts import trend_panels, years_of
+from fin_checkup.site.charts import peer_strips, trend_panels, years_of
 from fin_checkup.site.context import CompanyEntry, Site
 from fin_checkup.site.registry import company_context
 
@@ -13,3 +13,8 @@ from fin_checkup.site.registry import company_context
 def trend_context(entry: CompanyEntry, site: Site) -> dict[str, Any]:
     panels = trend_panels(entry.checkup)
     return {"trend_panels": panels, "trend_years": years_of(panels)}
+
+
+@company_context("peer_strip")
+def peer_strip_context(entry: CompanyEntry, site: Site) -> dict[str, Any]:
+    return {"peer_strips": peer_strips(entry.checkup)}

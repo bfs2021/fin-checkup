@@ -28,6 +28,7 @@
   /* 차트 막대 — 상태색과 겹치지 않는 파랑 하나 (dataviz validate_palette: 밝은·어두운 면 모두 통과) */
   --chart-1: #2a78d6;
   --chart-grid: #ecece8;
+  --chart-box: #d9d9d4;
 
   color-scheme: light dark;
 }
@@ -58,6 +59,7 @@
 
     --chart-1: #3987e5;
     --chart-grid: #2a2a27;
+    --chart-box: #4a4a45;
   }
 }
 
@@ -236,6 +238,23 @@ h3 { font-size: .9rem; color: var(--ink-muted); margin: 1.2rem 0 .5rem; letter-s
 .fc-ch-gap { fill: var(--surface-sunk); stroke: var(--border); stroke-width: 1; }
 .fc-ch .fc-ch-gap-mark { font-size: 13px; }
 .fc-ch .fc-ch-gap-text { font-size: 10px; }
+
+.fc-ch-whisker { stroke: var(--ink-muted); stroke-width: 1.5; }
+.fc-ch-box { fill: var(--chart-box); }
+.fc-ch-median { stroke: var(--ink); stroke-width: 2; }
+.fc-ch-marker { fill: var(--chart-1); stroke: var(--surface); stroke-width: 2; }
+.fc-ch-band { fill: var(--sig); }
+.fc-ch-edge { stroke: var(--ink-muted); stroke-width: 1; }
+
+.fc-peer { margin: .6rem 0 0; }
+.fc-peer figcaption, .fc-peer-key { font-size: .78rem; color: var(--ink-muted); }
+.fc-peer figcaption b { color: var(--ink); font-weight: 600; }
+.fc-peer-key { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: .15rem .7rem; }
+.fc-peer-key > span { white-space: nowrap; display: inline-flex; align-items: center; gap: .3rem; }
+.fc-key { display: inline-block; width: 12px; height: 10px; }
+.fc-key-box { background: var(--chart-box); border-radius: 2px; }
+.fc-key-median { width: 2px; height: 12px; background: var(--ink); }
+.fc-key-mine { width: 10px; border-radius: 50%; background: var(--chart-1); }
 
 .fc-trend-grid { display: grid; gap: 1rem; }
 .fc-trend { margin: 0; }
