@@ -3,6 +3,7 @@
   예시 회사는 site.examples.default_example — 지표 해설 페이지와 같은 회사. 회사의 색을 두고 좋다·나쁘다를 말하지 않는다.
 #}
 {% extends "base.html" %}
+{% from "_signal.html" import mark, badge %}
 {% block title %}재무제표 처음 읽기 — 회사 페이지 하나를 위에서부터 · fin-checkup{% endblock %}
 {% block description %}회계를 몰라도 읽을 수 있게, 실제 상장사 페이지 하나를 위에서부터 따라 읽어요. 숫자가 어디서 오는지, 신호등 🟢🟡🔴⚪⊘⚫ 읽는 법, 이 도구가 알려 주지 못하는 것.{% endblock %}
 {% block main %}
@@ -43,7 +44,7 @@
 
     <h3><a href="{{ url(home) }}#summary">맨 위 — 이름과 신호 개수</a></h3>
     <p>회사 이름 옆에 종목코드와 시장(KOSPI·KOSDAQ)이 있고, 그 아래 어느 해의 어떤 보고서로 계산했는지가 적혀 있어요. {{ fr.name_topic }} "{{ c.year }}년 {{ c.report_label }} · {{ c.statement_label }} · {{ c.sector_label }} 기준"이에요.</p>
-    <p>그 아래 칩은 신호마다 지표가 몇 개인지 센 것이에요. {{ fr.name_topic }} {% for chip in c.chips %}{{ chip.signal.emoji }} {{ chip.signal.label }} {{ chip.count }}개{% if not loop.last %}, {% endif %}{% endfor %}예요. 이 개수를 더하거나 빼서 점수를 만들지는 않아요. 지표마다 뜻이 달라서, 하나씩 읽어야 해요.</p>
+    <p>그 아래 칩은 신호마다 지표가 몇 개인지 센 것이에요. {{ fr.name_topic }} {% for chip in c.chips %}{{ mark(chip.signal.key) }}{{ chip.signal.label }} {{ chip.count }}개{% if not loop.last %}, {% endif %}{% endfor %}예요. 이 개수를 더하거나 빼서 점수를 만들지는 않아요. 지표마다 뜻이 달라서, 하나씩 읽어야 해요.</p>
 
     <h3><a href="{{ url(home) }}#metrics">지표 17개</a></h3>
     <p>지표는 다섯 묶음(수익성·안정성·성장성·이익의 질·효율성)으로 나뉘어 있어요. 카드 하나에는 신호, 값, <b>계산식</b>, <b>경계값</b>(어느 값부터 어느 색인지), 작년 값이 함께 있어요. 색만 보지 말고 계산식과 경계값을 같이 읽으면, 왜 그 색인지 직접 확인할 수 있어요.</p>
@@ -51,7 +52,7 @@
     <p>카드 안의 띠 그림은 같은 업종 회사들의 값이 어떻게 퍼져 있는지(가운데 50%와 중앙값) 위에 이 회사가 어디쯤인지 보여 줘요. 순위가 아니라 분포예요.</p>
 
     <h3><a href="{{ url(home) }}#trend">몇 년 추이</a></h3>
-    <p>최근 몇 해의 매출·이익·현금흐름 같은 숫자를 막대로 보여 줘요. 한 해 숫자만으로는 일시적인 변화인지 알 수 없어서, 흐름을 함께 봐요. 값이 없는 해는 0으로 그리지 않고 ⚫로 비워 둬요.</p>
+    <p>최근 몇 해의 매출·이익·현금흐름 같은 숫자를 막대로 보여 줘요. 한 해 숫자만으로는 일시적인 변화인지 알 수 없어서, 흐름을 함께 봐요. 값이 없는 해는 0으로 그리지 않고 {{ mark("unknown") }}데이터 없음으로 비워 둬요.</p>
 
     <h3><a href="{{ url(home) }}#red-flags">위험 신호</a></h3>
     <p>자본잠식이나 몇 년 연속 영업손실처럼 재무제표만으로 확인되는 사실을 따로 모아 둔 곳이에요. 무엇을 뜻하는지는 <a href="{{ url('learn/redflags/') }}">위험 신호 해설</a>에 있어요.</p>
@@ -67,10 +68,10 @@
     <h2 id="legend-title">3. 신호등 여섯 가지</h2>
     <ul class="fc-legend">
       {% for s in legend %}
-      <li class="fc-chip sig-{{ s.signal.key }}"><span aria-hidden="true">{{ s.signal.emoji }}</span> <b>{{ s.signal.label }}</b> — {{ s.meaning }}</li>
+      <li class="fc-chip sig-{{ s.signal.key }}">{{ mark(s.signal.key) }}<b>{{ s.signal.label }}</b> — {{ s.meaning }}</li>
       {% endfor %}
     </ul>
-    <p>🟢🟡🔴는 경계값으로 나눈 구간이에요. ⚪는 값은 있지만 업종마다 너무 달라 경계값을 두지 않은 지표, ⊘는 그 업종에는 맞지 않는 자라서 재지 않은 지표, ⚫는 공시에서 숫자를 찾지 못한 지표예요. ⊘와 ⚫를 0이나 🔴로 바꾸지 않아요.</p>
+    <p>{{ mark("green") }}정상·{{ mark("yellow") }}주의·{{ mark("red") }}위험은 경계값으로 나눈 구간이에요. {{ mark("neutral") }}측정값은 값은 있지만 업종마다 너무 달라 경계값을 두지 않은 지표, {{ mark("not_applicable") }}해당 없음은 그 업종에는 맞지 않는 잣대라서 재지 않은 지표, {{ mark("unknown") }}데이터 없음은 공시에서 숫자를 찾지 못한 지표예요. 해당 없음과 데이터 없음을 0이나 위험으로 바꾸지 않아요.</p>
   </section>
 
   <section class="fc-section" id="limits" aria-labelledby="limits-title">

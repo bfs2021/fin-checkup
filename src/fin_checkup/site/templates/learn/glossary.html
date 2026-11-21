@@ -22,7 +22,7 @@
     <dl class="fc-terms">
       {% for v in sec.terms %}
       <dt id="{{ v.t.slug }}">{{ v.t.term }}{% if v.t.aliases %} <small>({{ v.t.aliases | join(", ") }})</small>{% endif %}</dt>
-      <dd>{{ v.t.definition }}
+      <dd>{{ v.t.definition | marks }}
         {% if v.links %}<br><small>관련: {% for l in v.links %}<a href="{{ url(l.path) }}">{{ l.text }}</a>{% if not loop.last %} · {% endif %}{% endfor %}</small>{% endif %}
         {% if v.see_also %}<br><small>함께 볼 말: {% for s in v.see_also %}<a href="#{{ s.slug }}">{{ s.term }}</a>{% if not loop.last %} · {% endif %}{% endfor %}</small>{% endif %}
       </dd>

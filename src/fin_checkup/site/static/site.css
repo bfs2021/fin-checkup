@@ -203,6 +203,23 @@ h3 { font-size: .9rem; color: var(--ink-muted); margin: 1.2rem 0 .5rem; letter-s
   border-radius: 999px; padding: .2rem .7rem; font-size: .88rem;
 }
 .fc-legend .fc-chip { border-radius: 8px; display: block; }
+/* 신호 모양 (_signal.html · compare.js · watch.js) — 이모지 글꼴에 기대지 않는다. ⚪ 가 흑백 "○" 로 나와
+   '비어 있음' 처럼 보였다. 색 + 모양 + 글자: 정상 ●, 주의 ▲, 위험 ■, 측정값 ▬(잰 값), 해당 없음 ⊘, 데이터 없음 ◌(점선 빈 원). */
+.fc-mark {
+  display: inline-block; flex: none; width: .72em; height: .72em; margin-right: .3em;
+  vertical-align: -.04em; box-sizing: border-box; forced-color-adjust: none;
+}
+.mark-green { background: var(--sig-green); border-radius: 50%; }
+.mark-yellow { background: var(--sig-yellow); clip-path: polygon(50% 0, 100% 100%, 0 100%); width: .8em; }
+.mark-red { background: var(--sig-red); border-radius: 1px; }
+.mark-neutral { background: var(--sig-neutral); border-radius: 2px; width: .85em; height: .36em; vertical-align: .1em; }
+.mark-not_applicable {
+  border: 2px solid var(--sig-unknown); border-radius: 50%;
+  background: linear-gradient(135deg, transparent 43%, var(--sig-unknown) 43%, var(--sig-unknown) 57%, transparent 57%);
+}
+.mark-unknown { border: 2px dashed var(--sig-unknown); border-radius: 50%; }
+.fc-sig-glyph { color: var(--ink-muted); font-weight: 400; }
+
 .fc-chip b { font-variant-numeric: tabular-nums; }
 
 /* ── 회사 페이지 ──────────────────────────────────────── */
@@ -246,7 +263,7 @@ h3 { font-size: .9rem; color: var(--ink-muted); margin: 1.2rem 0 .5rem; letter-s
 .fc-metric-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: .2rem .6rem; }
 .fc-sig {
   font-size: .78rem; background: var(--tint); border-radius: 999px; padding: .05rem .5rem;
-  white-space: nowrap;
+  white-space: nowrap; display: inline-flex; align-items: center;
 }
 .fc-metric-label { font-weight: 600; }
 .fc-metric-value {

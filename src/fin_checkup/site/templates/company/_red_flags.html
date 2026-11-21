@@ -1,9 +1,10 @@
+{% from "_signal.html" import mark, badge %}
 <section class="fc-section" id="red-flags" aria-labelledby="red-flags-title">
   <h2 id="red-flags-title">위험 신호</h2>
   {% if c.red_flags %}
   <ul class="fc-flags">
     {% for flag in c.red_flags %}
-    <li class="sig-red"><span aria-hidden="true">🔴</span> <b>{{ flag.label }}</b> — {{ flag.detail }}{% if flag.reference %}<br><small>{{ flag.reference }}</small>{% endif %}</li>
+    <li class="sig-red">{{ mark("red") }}<span class="fc-visually-hidden">위험 신호: </span><b>{{ flag.label }}</b> — {{ flag.detail }}{% if flag.reference %}<br><small>{{ flag.reference }}</small>{% endif %}</li>
     {% endfor %}
   </ul>
   {% else %}

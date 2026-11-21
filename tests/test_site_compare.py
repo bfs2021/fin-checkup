@@ -153,7 +153,9 @@ def test_browser_compares_adds_and_removes_in_the_order_chosen(out):
 
         # 금융지주의 부채비율은 ⊘ — 판정하지 않고 대신 볼 것을 적는다.
         kb_debt = page.locator('tr[data-key="debt_ratio"] td.fc-compare-value').nth(0)
-        assert "⊘" in kb_debt.text_content()
+        # 신호는 이모지가 아니라 CSS 모양 + 이름 (test_site_signal_marks).
+        assert kb_debt.locator(".fc-mark.mark-not_applicable").count() == 1
+        assert "해당 없음" in kb_debt.text_content()
         assert "대신 볼 것" in kb_debt.text_content()
         samsung_debt = page.locator('tr[data-key="debt_ratio"] td.fc-compare-value').nth(1)
         assert "66.67%" in samsung_debt.text_content()

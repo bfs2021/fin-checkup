@@ -8,6 +8,7 @@ from datetime import date
 
 import pytest
 from hub_seed import seed_site_cache
+from site_text import unmark
 
 from fin_checkup.explain import banned, sector_reading
 from fin_checkup.explain.metrics import get_explainer, threshold_text
@@ -28,7 +29,7 @@ async def out(tmp_path):
 
 
 def page(out) -> str:
-    return html.unescape((out / "learn" / "sectors" / "index.html").read_text(encoding="utf-8"))
+    return unmark(html.unescape((out / "learn" / "sectors" / "index.html").read_text(encoding="utf-8")))
 
 
 def section(text: str, ident: str) -> str:
@@ -51,7 +52,7 @@ async def test_not_applicable_metrics_come_from_the_engine_with_instead(out, sec
         caveat = e.caveat_for(sector)
         assert e.label in block and caveat.why in block and caveat.instead in block, key
         assert f'href="../../m/{key}/"' in block
-    assert f"⊘</span> {len(NOT_APPLICABLE_BY_SECTOR[sector])}개" in block
+    assert f"⊘ {len(NOT_APPLICABLE_BY_SECTOR[sector])}개" in block
 
 
 async def test_sector_specific_band_and_the_rest_are_spelled_out(out):

@@ -9,6 +9,7 @@ from datetime import date
 
 import pytest
 from hub_seed import HLB, KB, NO_DATA, SAMSUNG, UNLISTED, seed_site_cache, statements
+from site_text import unmark
 
 from fin_checkup.explain import banned
 from fin_checkup.explain.sectors import KSIC_DIVISIONS, group_sector, peer_group_info
@@ -76,7 +77,7 @@ async def out(tmp_path):
 
 
 def read(out, *parts) -> str:
-    return html.unescape((out.joinpath(*parts)).read_text(encoding="utf-8"))
+    return unmark(html.unescape((out.joinpath(*parts)).read_text(encoding="utf-8")))
 
 
 def section(text: str, ident: str) -> str:
