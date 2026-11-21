@@ -16,6 +16,7 @@ from datetime import date
 from functools import cached_property
 from posixpath import normpath
 from typing import Any
+from urllib.parse import urlsplit
 
 from jinja2 import Environment
 
@@ -112,12 +113,22 @@ class Site:
         return self.base_url + path.lstrip("/")
 
     @property
+    def root_path(self) -> str:
+        """사이트 루트의 경로 부분 — `https://x.github.io/fin-checkup/` → `/fin-checkup/`.
+
+        상대 링크가 안 통하는 페이지(어느 깊이의 주소로든 서빙되는 `404.html`)만 쓴다.
+        """
+        path = urlsplit(self.base_url).path or "/"
+        return path if path.endswith("/") else path + "/"
+
+    @property
     def has_absolute_base(self) -> bool:
         return self.base_url.startswith(("https://", "http://"))
 
     def canonical_url(self, output_path: str) -> str | None:
         """그 페이지의 절대주소. base_url 이 절대주소가 아니면 None (태그를 내지 않는다)."""
-        if not self.has_absolute_base:
+        # 404.html 은 없는 주소 어디서든 서빙된다 — 그 페이지의 '정식 주소' 는 없다.
+        if not self.has_absolute_base or output_path == "404.html":
             return None
         return self.absolute_url(page_url(output_path))
 
@@ -128,9 +139,13 @@ class Site:
         return self.absolute_url(f"og/{stock_code}.png")
 
     def render(self, template: str, output_path: str, **context: Any) -> Output:
-        """템플릿 하나를 출력 경로에 렌더한다. root·site 는 자동으로 들어간다."""
+        """템플릿 하나를 출력 경로에 렌더한다. root·site 는 자동으로 들어간다.
+
+        `root=` 를 넘기면 상대경로 대신 그 값을 링크 기준으로 쓴다 (`404.html` 의 `site.root_path`).
+        """
         path = safe_output_path(output_path)
+        root = context.pop("root", None) or root_for(path)
         html = self.env.get_template(template).render(
-            site=self, root=root_for(path), page_path=path, **context
+            site=self, root=root, page_path=path, **context
         )
         return Output(path, html)

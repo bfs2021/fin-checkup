@@ -44,6 +44,7 @@ async def test_sitemap_lists_every_html_page_with_absolute_urls(out):
         for p in out.rglob("*.html")
         if 'name="robots" content="noindex"' not in p.read_text(encoding="utf-8")
     )
+    assert (out / "404.html").exists() and "404.html" not in html_pages  # noindex — 색인하지 않는다
     assert len(urls) == len(html_pages) == len(set(urls))
     assert urls[0] == BASE, "홈이 맨 앞"
     for code in ("005930", "105560", "028300"):

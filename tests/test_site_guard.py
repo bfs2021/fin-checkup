@@ -37,10 +37,16 @@ def out(tmp_path):
     return target
 
 
-def page(body: str = "", head: str = CSP, disclaimer: str = DISCLAIMER) -> bytes:
+def page(
+    body: str = "", head: str = CSP, disclaimer: str = DISCLAIMER, lang: str = "ko", skip: bool = True
+) -> bytes:
+    """가드를 통과하는 최소 페이지 — 규칙 하나씩 어긋나게 만들어 본다."""
+    skip_link = '<a href="#main">본문으로</a>' if skip else ""
     return (
-        f'<!doctype html><html lang="ko"><head>{head}</head>'
-        f"<body><main>{body}</main><footer><p>{disclaimer}</p></footer></body></html>"
+        f'<!doctype html><html lang="{lang}"><head>{head}</head><body>{skip_link}'
+        '<header><a href="./">fin-checkup</a>'
+        '<nav aria-label="사이트"><a href="./learn/">읽는 법</a></nav></header>'
+        f'<main id="main">{body}</main><footer><p>{disclaimer}</p></footer></body></html>'
     ).encode()
 
 
@@ -95,33 +101,35 @@ def test_disclaimer_is_required_verbatim():
     assert rules("x.html", page(disclaimer="투자권유 아님")) == ["disclaimer"]
 
 
+SIGN = {"red": "🔴 위험", "yellow": "🟡 주의", "green": "🟢 정상", "neutral": "⚪ 측정값"}
+
+
+def card(signal: str, basis: str, ident: str = "m-a") -> str:
+    """회사 페이지 지표 카드 꼴 — 신호 기호·글자 + 계산식·경계값 목록."""
+    return (
+        f'<li class="fc-metric sig-{signal}" id="{ident}"><span class="fc-sig">{SIGN[signal]}</span>'
+        f"<dl>{basis}</dl></li>"
+    )
+
+
 def test_judged_metric_needs_formula_and_thresholds():
-    ok = (
-        '<li class="fc-metric sig-red" id="m-a"><dl><dt>계산식</dt><dd>부채 ÷ 자본</dd>'
-        "<dt>경계값</dt><dd>정상 100% 이하</dd></dl></li>"
-    )
+    ok = card("red", "<dt>계산식</dt><dd>부채 ÷ 자본</dd><dt>경계값</dt><dd>정상 100% 이하</dd>")
     assert rules("x.html", page(ok)) == []
-    no_band = '<li class="fc-metric sig-yellow" id="m-b"><dl><dt>계산식</dt><dd>a ÷ b</dd></dl></li>'
+    no_band = card("yellow", "<dt>계산식</dt><dd>a ÷ b</dd>")
     assert rules("x.html", page(no_band)) == ["basis"]
-    empty_formula = (
-        '<li class="fc-metric sig-green"><dl><dt>계산식</dt><dd> </dd><dt>경계값</dt><dd>x</dd></dl></li>'
-    )
+    empty_formula = card("green", "<dt>계산식</dt><dd> </dd><dt>경계값</dt><dd>x</dd>")
     assert rules("x.html", page(empty_formula)) == ["basis"]
 
 
 def test_unjudged_metric_needs_formula_only():
-    neutral = '<li class="fc-metric sig-neutral"><dl><dt>계산식</dt><dd>매출 ÷ 자산</dd></dl></li>'
-    assert rules("x.html", page(neutral)) == []
-    card = '<li class="fc-metric"><dl><dt>중앙값</dt><dd>3%</dd></dl></li>'
-    assert rules("x.html", page(card)) == ["basis"]
+    assert rules("x.html", page(card("neutral", "<dt>계산식</dt><dd>매출 ÷ 자산</dd>"))) == []
+    distribution = '<li class="fc-metric"><dl><dt>중앙값</dt><dd>3%</dd></dl></li>'
+    assert rules("x.html", page(distribution)) == ["basis"]
 
 
 def test_sector_label_on_threshold_term_still_counts():
-    card = (
-        '<li class="fc-metric sig-red"><dl><dt>계산식</dt><dd>a</dd>'
-        "<dt>경계값 (금융업)</dt><dd>b</dd></dl></li>"
-    )
-    assert rules("x.html", page(card)) == []
+    sector_card = card("red", "<dt>계산식</dt><dd>a</dd><dt>경계값 (금융업)</dt><dd>b</dd>")
+    assert rules("x.html", page(sector_card)) == []
 
 
 @pytest.mark.parametrize(
@@ -231,6 +239,30 @@ def test_no_dart_key_like_strings_anywhere(path):
 def test_longer_hex_runs_are_not_keys():
     """SHA-256(64자리)은 인증키 꼴이 아니다 — 40자리 경계로만 본다."""
     assert rules("x.json", ("a" * 64).encode()) == []
+
+
+def test_page_language_skip_link_and_landmarks():
+    assert rules("x.html", page(lang="en")) == ["a11y"]
+    assert rules("x.html", page(skip=False)) == ["a11y"]
+    no_nav = page().replace(b'<nav aria-label="\xec\x82\xac\xec\x9d\xb4\xed\x8a\xb8">', b"<div>")
+    no_nav = no_nav.replace(b"</nav>", b"</div>")
+    assert rules("x.html", no_nav) == ["a11y"]
+    two_mains = page('<main id="other">x</main>')
+    assert rules("x.html", two_mains) == ["a11y"]
+    # 본문 안 article 의 header·footer 는 페이지 머리·꼬리가 아니다.
+    only_inner = (
+        page().replace(b"<header>", b"<article><header>").replace(b"</header>", b"</header></article>")
+    )
+    assert rules("x.html", only_inner) == ["a11y"]
+
+
+def test_signals_are_never_color_only():
+    ok = '<ul><li class="fc-chip sig-red"><span aria-hidden="true">🔴</span> 위험 <b>2</b></li></ul>'
+    assert rules("x.html", page(ok)) == []
+    symbol_only = '<ul><li class="sig-red"><span aria-hidden="true">🔴</span> <b>자본잠식</b></li></ul>'
+    assert rules("x.html", page(symbol_only)) == [], "기호가 있으면 색만은 아니다"
+    color_only = '<ul><li class="fc-chip sig-yellow"><b>3</b></li></ul>'
+    assert rules("x.html", page(color_only)) == ["a11y"]
 
 
 # ── CLI ────────────────────────────────────────────────────────────

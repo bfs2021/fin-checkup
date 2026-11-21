@@ -172,7 +172,8 @@ async def test_company_page_links_to_its_sector_page(out):
     assert 'href="../../s/26/"' in samsung
     assert "KSIC 26 · 6곳" in samsung
     hlb = read(out, "c", "028300", "index.html")
-    assert 'href="../../s/' not in hlb, "업종코드가 없으면 업종 링크도 없다"
+    hlb_main = hlb.split("<main", 1)[1].split("</main>", 1)[0]  # 머리 nav 의 '업종'(s/) 링크는 뺀다
+    assert 'href="../../s/' not in hlb_main, "업종코드가 없으면 업종 링크도 없다"
 
 
 async def test_sector_pages_have_no_ranking_or_advice_words(out):

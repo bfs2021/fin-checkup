@@ -18,7 +18,11 @@ CSP = '<meta http-equiv="Content-Security-Policy" content="default-src \'self\'"
 
 
 def page(body: str) -> bytes:
-    return f"<html><head>{CSP}</head><body>{body}<p>{DISCLAIMER}</p></body></html>".encode()
+    return (
+        f'<html lang="ko"><head>{CSP}</head><body><a href="#main">본문으로</a>'
+        f'<header><nav><a href="./">홈</a></nav></header><main id="main">{body}</main>'
+        f"<footer><p>{DISCLAIMER}</p></footer></body></html>"
+    ).encode()
 
 
 # ── 소스 ───────────────────────────────────────────────────────────
