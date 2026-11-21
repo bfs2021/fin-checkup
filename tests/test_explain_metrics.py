@@ -21,7 +21,7 @@ from fin_checkup.explain.metrics import (
 from fin_checkup.metrics.engine import METRIC_DEFS, NOT_APPLICABLE_BY_SECTOR, checkup
 from fin_checkup.metrics.sector import Sector
 from fin_checkup.metrics.signals import Band, Signal
-from fin_checkup.models import Financials, FsDiv, ReportCode
+from fin_checkup.models import Financials, FsDiv, InterestSource, ReportCode
 
 ENGINE_KEYS = [d.key for d in METRIC_DEFS]
 
@@ -148,6 +148,8 @@ SPECIAL_CASES = [
     ("roe", dict(net_income=10, total_equity=-5), None, Signal.UNKNOWN),
     ("debt_ratio", dict(total_liabilities=100, total_equity=0), None, Signal.RED),
     ("interest_coverage", dict(operating_income=10, interest_expense=0), None, Signal.GREEN),
+    ("interest_coverage", dict(operating_income=10, interest_expense=4,
+                               interest_expense_source=InterestSource.FINANCE_COSTS), None, Signal.NEUTRAL),
     ("revenue_growth", dict(revenue=100), dict(revenue=0), Signal.UNKNOWN),
     ("operating_income_growth", dict(operating_income=10), dict(operating_income=-5), Signal.GREEN),
     ("operating_income_growth", dict(operating_income=-3), dict(operating_income=-5), Signal.RED),

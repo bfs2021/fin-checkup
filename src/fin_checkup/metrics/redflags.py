@@ -13,7 +13,7 @@ from dataclasses import dataclass
 
 from fin_checkup.format import format_money
 from fin_checkup.metrics.sector import Sector
-from fin_checkup.models import Financials
+from fin_checkup.models import Financials, InterestSource
 
 #: 판정 경계. 해설(explain.redflags)이 이 값을 그대로 문장에 옮긴다 — 여기만 고치면 된다.
 #: 자본잠식률이 이 % 이상이면 부분 자본잠식 신호.
@@ -131,6 +131,9 @@ def _trailing_zombie_streak(ordered: list[Financials]) -> int:
     for fin in reversed(ordered):
         op, interest = fin.operating_income, fin.interest_expense
         if op is None or interest is None or interest == 0:
+            break
+        # 금융원가 대체값(외환손실 포함)으로는 '이자도 못 갚았다'를 단정하지 않는다.
+        if fin.interest_expense_source is InterestSource.FINANCE_COSTS:
             break
         if op / interest < ZOMBIE_COVERAGE_MAX:
             streak += 1

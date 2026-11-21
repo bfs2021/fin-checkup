@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Any
 
-from fin_checkup.models import Financials, FsDiv, ReportCode
+from fin_checkup.models import Financials, FsDiv, InterestSource, ReportCode
 
 #: 이 일수 이상이어야 연간 값으로 본다. 분기(약 90일)를 걸러내기 위한 것.
 MIN_ANNUAL_DAYS = 300
@@ -187,5 +187,9 @@ def normalize_company_facts(
         reprt_code=ReportCode.ANNUAL,
         fs_div=FsDiv.CFS,
         currency="USD",
+        # 10-K 의 이자비용 태그는 손익계산서 계정이다(DART 처럼 금융원가로 떨어지는 길이 없다).
+        interest_expense_source=(
+            InterestSource.INCOME_STATEMENT if values.get("interest_expense") is not None else None
+        ),
         **values,
     )

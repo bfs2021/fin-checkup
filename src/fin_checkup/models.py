@@ -140,6 +140,30 @@ class RawStatements(BaseModel):
     lines: list[AccountLine] = Field(default_factory=list)
 
 
+class InterestSource(str, Enum):
+    """이자비용(`Financials.interest_expense`)을 어느 계정에서 가져왔나.
+
+    손익계산서에 이자비용을 따로 적는 상장사는 4% 남짓이다(2024, 117/2,759). 나머지는
+    금융원가 한 줄로 묶어 적는데, 거기엔 외환·파생 손실이 섞인다 — 삼성전자 2024 금융비용
+    12.99조 중 실제 이자 지급은 0.68조였다. 출처를 남겨야 그 값을 이자로 판정할지 정할 수 있다.
+    """
+
+    #: 손익계산서의 이자비용 단독 계정.
+    INCOME_STATEMENT = "income_statement"
+    #: 현금흐름표의 이자의 지급(영업·투자·재무 합). 현금으로 나가지 않은 이자는 빠진다.
+    CASH_FLOW = "cash_flow"
+    #: 금융원가·금융비용. 이자 말고도 섞여 있어 판정하지 않는 대체값이다.
+    FINANCE_COSTS = "finance_costs"
+
+    @property
+    def label(self) -> str:
+        return {
+            "income_statement": "손익계산서 이자비용",
+            "cash_flow": "현금흐름표 이자의 지급",
+            "finance_costs": "금융원가(대체값)",
+        }[self.value]
+
+
 class Financials(BaseModel):
     """지표 계산에 필요한 계정만 정규화한 결과.
 
@@ -169,6 +193,8 @@ class Financials(BaseModel):
     operating_income: float | None = None
     net_income: float | None = None
     interest_expense: float | None = None
+    #: interest_expense 의 출처. 값이 없으면 None.
+    interest_expense_source: InterestSource | None = None
 
     # 현금흐름표
     operating_cash_flow: float | None = None

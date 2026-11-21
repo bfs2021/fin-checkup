@@ -14,7 +14,7 @@ from enum import Enum
 
 from fin_checkup.metrics.sector import Sector
 from fin_checkup.metrics.signals import SEVERITY, Band, Signal
-from fin_checkup.models import Financials
+from fin_checkup.models import Financials, InterestSource
 
 #: 금액 지표의 unit. 실제 통화(원/달러)는 CheckupResult.currency에서 결정된다.
 #: 여기에 "원"을 박아두면 미국 기업 금액에도 원이 붙는다.
@@ -44,6 +44,9 @@ class Metric:
     note: str = ""
     #: 판정에 쓰인 경계값. UI에서 "왜 이 색인지" 보여주기 위해 노출한다.
     band: Band | None = None
+    #: 지표가 요구하는 계정 대신 대체 계정으로 계산했다(금융원가로 낸 이자보상배율).
+    #: 값은 보여 주되 판정하지 않고, 대조군·전년 비교에도 쓰지 않는다 — 분모가 다른 값끼리다.
+    proxy: bool = False
 
 
 @dataclass
@@ -115,7 +118,9 @@ Override = Callable[
 #:
 #: **안정성**은 반대다. 부채비율 200%나 이자보상배율 1은 "갚을 수 있는가"라는 절대적
 #: 의미가 있어 시장 분포에 맞추지 않는다. 실측 분포도 합리적이었다(부채비율 🔴 12.6%).
-#: 이자보상배율이 🔴 49%인 건 경계가 틀려서가 아니라 실제로 그만큼 많다는 뜻이다.
+#: 이자보상배율이 🔴 49%로 나왔던 데엔 분모 탓도 있었다 — 상장사 94%가 이자비용 단독 계정이
+#: 없어 금융원가(외환손실 포함)로 계산되고 있었다. 이자 지급액을 먼저 쓰도록 고친 뒤(2026-11)
+#: 2024 상장사 판정분 2,417곳 중 🔴 1,018곳(42%), 그중 843곳이 영업적자다. 경계는 그대로다.
 #:
 #: 지표별 실측 분위수 (일반업종 880사, 2024):
 #:   영업이익률 p50=2.4 p75=7.0 | 순이익률 p50=2.4 p75=7.7
@@ -168,6 +173,8 @@ class MetricDef:
     override: Override | None = None
     #: 업종별로 다른 경계값. 없으면 band를 쓴다.
     sector_bands: dict[Sector, Band] | None = None
+    #: 이 재무로는 대체 계정으로 계산되는가 (→ Metric.proxy).
+    is_proxy: Callable[[Financials], bool] | None = None
 
     def band_for(self, sector: Sector) -> Band | None:
         if self.sector_bands and sector in self.sector_bands:
@@ -202,19 +209,49 @@ def _debt_ratio_override(
     return None
 
 
+#: 손익계산서에 이자비용 단독 계정이 없어 현금흐름표 이자 지급액으로 계산했을 때.
+INTEREST_PAID_NOTE = (
+    "현금흐름표의 이자 지급액 기준(손익계산서에 이자비용 단독 계정 없음). "
+    "전환사채 상각이자처럼 현금으로 나가지 않은 이자는 빠진다."
+)
+#: 금융원가로밖에 계산할 수 없을 때. 금융원가 ≥ 이자비용이라 배율은 실제보다 낮게만 틀린다.
+FINANCE_COSTS_PROXY_NOTE = (
+    "이자비용 단독 계정이 없어 금융원가(외환손실 등 포함)로 계산 — "
+    "실제보다 낮게 나올 수 있어 판정하지 않음."
+)
+
+
+def _interest_is_proxy(cur: Financials) -> bool:
+    """금융원가 대체값으로 낸 배율인가. 금융원가 0 은 '이자도 0' 이라 대체가 아니다."""
+    return cur.interest_expense_source is InterestSource.FINANCE_COSTS and bool(cur.interest_expense)
+
+
 def _interest_coverage(cur: Financials, _prior: Financials | None) -> tuple[float | None, str]:
     if cur.interest_expense == 0:
         return None, ""
-    return _ratio(cur.operating_income, cur.interest_expense), ""
+    value = _ratio(cur.operating_income, cur.interest_expense)
+    if value is not None and cur.interest_expense_source is InterestSource.CASH_FLOW:
+        return value, INTEREST_PAID_NOTE
+    return value, ""
 
 
 def _interest_coverage_override(
     cur: Financials, _p: Financials | None, value: float | None
 ) -> tuple[Signal, str] | None:
     if cur.interest_expense == 0:
+        if cur.interest_expense_source is InterestSource.FINANCE_COSTS:
+            return Signal.GREEN, "금융원가가 0으로 공시됨 — 이자비용도 없다(사실상 무차입)."
         return Signal.GREEN, "이자비용이 0으로 공시됨 — 사실상 무차입."
-    if value is not None and value < 1:
-        return Signal.RED, "영업이익으로 이자비용을 다 갚지 못하는 상태다."
+    if value is None:
+        return None
+    if _interest_is_proxy(cur):
+        # 외환·파생 손실이 분모에 섞였다. 삼성전자 2024 가 이 값으로 2.52배 🟡 였다(이자 지급 기준 48배).
+        return Signal.NEUTRAL, FINANCE_COSTS_PROXY_NOTE
+    if value < 1:
+        note = "영업이익으로 이자비용을 다 갚지 못하는 상태다."
+        if cur.interest_expense_source is InterestSource.CASH_FLOW:
+            note = f"{note} {INTEREST_PAID_NOTE}"
+        return Signal.RED, note
     return None
 
 
@@ -356,6 +393,7 @@ METRIC_DEFS: tuple[MetricDef, ...] = (
         "번 돈으로 이자를 몇 번 갚을 수 있는지. 1 미만이 이어지면 이른바 좀비기업이다.",
         "영업이익 ÷ 이자비용",
         _interest_coverage, Band(good=3, warn=1), _interest_coverage_override,
+        is_proxy=_interest_is_proxy,
     ),
     MetricDef(
         "equity_ratio", "자기자본비율", Category.STABILITY, "%",
@@ -448,6 +486,7 @@ def checkup(
 
     for spec in METRIC_DEFS:
         band = spec.band_for(sector)
+        proxy = spec.is_proxy(current) if spec.is_proxy is not None else False
 
         # 적용 불가 판정이 가장 먼저다. 값이 나오더라도 판정하지 않는다.
         if spec.key in not_applicable:
@@ -458,7 +497,7 @@ def checkup(
                     value=value, unit=spec.unit, signal=Signal.NOT_APPLICABLE,
                     description=spec.description, formula=spec.formula,
                     note=f"{sector.label}에는 적용하지 않는다 — {not_applicable[spec.key]}",
-                    band=None,
+                    band=None, proxy=proxy,
                 )
             )
             continue
@@ -492,6 +531,7 @@ def checkup(
                 formula=spec.formula,
                 note=note,
                 band=band,
+                proxy=proxy,
             )
         )
 

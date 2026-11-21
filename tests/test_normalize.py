@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from fin_checkup.dart.normalize import normalize_statements
-from fin_checkup.models import AccountLine, FsDiv, RawStatements, ReportCode
+from fin_checkup.models import AccountLine, FsDiv, InterestSource, RawStatements, ReportCode
 
 
 def line(sj_div: str, account_id: str, account_nm: str, amount: float | None) -> AccountLine:
@@ -122,6 +122,110 @@ def test_interest_expense_prefers_explicit_over_finance_cost():
         )
     )
     assert fin.interest_expense == 40.0
+    assert fin.interest_expense_source is InterestSource.INCOME_STATEMENT
+
+
+# ── 이자비용의 출처: 손익계산서 이자비용 → 현금흐름표 이자 지급 → 금융원가 ──────
+# 2024 상장사 2,759곳 중 손익계산서에 이자비용 단독 계정이 있는 곳은 117곳뿐이다.
+# 나머지는 금융원가(외환손실·파생손실 포함)로 떨어졌다 — 삼성전자 금융비용 12.99조
+# vs 실제 이자 지급 0.68조. 이자보상배율이 2.52배(🟡)로 찍혔다.
+
+
+def test_interest_from_standard_id_records_income_statement_source():
+    fin = normalize_statements(
+        raw(
+            line("IS", "ifrs-full_FinanceCosts", "금융원가", 90.0),
+            line("IS", "ifrs-full_InterestExpense", "이자비용", 40.0),
+            line("CF", "ifrs-full_InterestPaidClassifiedAsOperatingActivities", "이자의 지급", 35.0),
+        )
+    )
+    assert fin.interest_expense == 40.0
+    assert fin.interest_expense_source is InterestSource.INCOME_STATEMENT
+
+
+def test_cash_flow_interest_paid_beats_finance_costs():
+    fin = normalize_statements(
+        raw(
+            line("IS", "ifrs-full_FinanceCosts", "금융비용", 12_985_684.0),
+            line("CF", "ifrs-full_InterestPaidClassifiedAsOperatingActivities", "이자의 지급", -675_049.0),
+        )
+    )
+    assert fin.interest_expense == 675_049.0, "유출 부호는 절댓값으로"
+    assert fin.interest_expense_source is InterestSource.CASH_FLOW
+
+
+def test_interest_paid_split_across_activities_is_summed():
+    # 영업·재무·투자(자본화 이자)로 나눠 적는 회사가 있다. 한 줄만 쓰면 지급액이 모자란다.
+    fin = normalize_statements(
+        raw(
+            line("IS", "ifrs-full_FinanceCosts", "금융원가", 500.0),
+            line("CF", "ifrs-full_InterestPaidClassifiedAsOperatingActivities", "이자지급(영업)", 160.0),
+            line("CF", "ifrs-full_InterestPaidClassifiedAsInvestingActivities", "이자의 지급", 80.0),
+            line("CF", "ifrs-full_InterestPaidClassifiedAsFinancingActivities", "이자지급", -20.0),
+        )
+    )
+    assert fin.interest_expense == 260.0
+    assert fin.interest_expense_source is InterestSource.CASH_FLOW
+
+
+def test_hybrid_capital_distribution_is_not_interest_paid():
+    # 신종자본증권은 자본이다. 그 '이자'는 배당과 같은 분배라 이자 지급에 넣지 않는다.
+    fin = normalize_statements(
+        raw(
+            line("IS", "ifrs-full_FinanceCosts", "금융원가", 500.0),
+            line("CF", "ifrs-full_InterestPaidClassifiedAsOperatingActivities", "이자의 지급", 50.0),
+            line("CF", "ifrs-full_InterestPaidClassifiedAsFinancingActivities",
+                 "신종자본증권의 이자지급", 7.0),
+        )
+    )
+    assert fin.interest_expense == 50.0
+
+
+def test_interest_paid_by_korean_name_with_numbering():
+    fin = normalize_statements(
+        raw(
+            line("IS", "-표준계정코드 미사용-", "금융원가", 500.0),
+            line("CF", "-표준계정코드 미사용-", "3. 이자의 지급", 30.0),
+        )
+    )
+    assert fin.interest_expense == 30.0
+    assert fin.interest_expense_source is InterestSource.CASH_FLOW
+
+
+def test_indirect_method_interest_adjustment_is_not_interest_paid():
+    # 간접법의 '이자비용 조정'은 현금 지급이 아니다. 이름이 '이자비용'이어도 집지 않는다.
+    fin = normalize_statements(
+        raw(
+            line("IS", "ifrs-full_FinanceCosts", "금융원가", 500.0),
+            line("CF", "dart_AdjustmentsForInterestExpenses", "이자비용", 45.0),
+        )
+    )
+    assert fin.interest_expense == 500.0
+    assert fin.interest_expense_source is InterestSource.FINANCE_COSTS
+
+
+def test_zero_interest_paid_falls_through_to_finance_costs():
+    # 현금 지급 0 은 무차입의 증거가 아니다 — 전환사채 상각이자는 현금이 나가지 않는다.
+    fin = normalize_statements(
+        raw(
+            line("IS", "ifrs-full_FinanceCosts", "금융원가", 90.0),
+            line("CF", "ifrs-full_InterestPaidClassifiedAsOperatingActivities", "이자의 지급", 0.0),
+        )
+    )
+    assert fin.interest_expense == 90.0
+    assert fin.interest_expense_source is InterestSource.FINANCE_COSTS
+
+
+def test_finance_costs_is_the_last_resort():
+    fin = normalize_statements(raw(line("IS", "x", "금융비용", -90.0)))
+    assert fin.interest_expense == 90.0
+    assert fin.interest_expense_source is InterestSource.FINANCE_COSTS
+
+
+def test_no_interest_line_at_all_has_no_source():
+    fin = normalize_statements(raw(line("IS", "dart_OperatingIncomeLoss", "영업이익", 10.0)))
+    assert fin.interest_expense is None
+    assert fin.interest_expense_source is None
 
 
 def test_bs_account_is_not_picked_from_income_statement_section():

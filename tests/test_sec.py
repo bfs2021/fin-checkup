@@ -124,6 +124,8 @@ def test_net_interest_income_is_not_treated_as_interest_expense():
     fin = normalize_company_facts(expense, 2023)
     assert fin is not None
     assert fin.interest_expense == 500_000_000
+    assert fin.interest_expense_source is not None
+    assert fin.interest_expense_source.value == "income_statement"
 
 
 def test_fiscal_years_ending_in_early_january_belong_to_the_prior_year():

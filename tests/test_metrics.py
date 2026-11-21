@@ -2,9 +2,17 @@ from __future__ import annotations
 
 import pytest
 
+from fin_checkup.dart.normalize import normalize_statements
 from fin_checkup.metrics.engine import checkup
 from fin_checkup.metrics.signals import Signal
-from fin_checkup.models import Financials, FsDiv, ReportCode
+from fin_checkup.models import (
+    AccountLine,
+    Financials,
+    FsDiv,
+    InterestSource,
+    RawStatements,
+    ReportCode,
+)
 
 
 def fin(**kwargs) -> Financials:
@@ -341,3 +349,102 @@ def test_missing_revenue_with_zero_inventory_is_unknown_not_applicable():
     # 매출액 계정을 못 찾은 게 진짜 문제다. 재고 0 을 탓하면 정규화 결함이 가려진다.
     m = get(checkup(fin(inventories=0)), "inventory_turnover")
     assert m.signal is Signal.UNKNOWN
+
+
+# ── 이자보상배율: 분모의 출처 ───────────────────────────────────────
+# 금융원가에는 외환·파생 손실이 섞인다. 그걸 이자로 놓고 판정하면 삼성전자가
+# 2.52배 🟡 가 된다(실제 이자 지급 기준 48배).
+
+
+def test_finance_cost_proxy_is_measured_but_not_judged():
+    m = get(
+        checkup(fin(operating_income=50, interest_expense=100,
+                    interest_expense_source=InterestSource.FINANCE_COSTS)),
+        "interest_coverage",
+    )
+    assert m.value == pytest.approx(0.5), "값은 보여 준다"
+    assert m.signal is Signal.NEUTRAL, "대체값으로 🔴 를 내지 않는다"
+    assert m.proxy is True
+    assert "금융원가" in m.note and "판정하지 않음" in m.note
+
+
+def test_finance_cost_proxy_above_good_band_is_still_not_judged():
+    m = get(
+        checkup(fin(operating_income=500, interest_expense=100,
+                    interest_expense_source=InterestSource.FINANCE_COSTS)),
+        "interest_coverage",
+    )
+    assert m.signal is Signal.NEUTRAL
+
+
+def test_zero_finance_costs_still_means_no_interest():
+    # 금융원가 ⊇ 이자비용. 금융원가가 0 이면 이자도 0 이다.
+    m = get(
+        checkup(fin(operating_income=50, interest_expense=0,
+                    interest_expense_source=InterestSource.FINANCE_COSTS)),
+        "interest_coverage",
+    )
+    assert m.signal is Signal.GREEN
+    assert m.proxy is False
+
+
+def test_cash_flow_interest_paid_is_graded_with_a_note():
+    m = get(
+        checkup(fin(operating_income=500, interest_expense=100,
+                    interest_expense_source=InterestSource.CASH_FLOW)),
+        "interest_coverage",
+    )
+    assert m.signal is Signal.GREEN
+    assert m.proxy is False
+    assert "현금흐름표의 이자 지급액 기준" in m.note
+
+
+def test_cash_flow_interest_paid_below_one_is_red_and_keeps_the_source_note():
+    m = get(
+        checkup(fin(operating_income=50, interest_expense=100,
+                    interest_expense_source=InterestSource.CASH_FLOW)),
+        "interest_coverage",
+    )
+    assert m.signal is Signal.RED
+    assert "갚지 못하는" in m.note and "현금흐름표의 이자 지급액 기준" in m.note
+
+
+def test_income_statement_interest_has_no_source_note():
+    m = get(
+        checkup(fin(operating_income=500, interest_expense=100,
+                    interest_expense_source=InterestSource.INCOME_STATEMENT)),
+        "interest_coverage",
+    )
+    assert m.signal is Signal.GREEN
+    assert m.note == ""
+
+
+def _samsung_2024(*, with_cash_flow: bool) -> Financials:
+    """삼성전자 2024 연결 실공시 값(원). 손익계산서엔 이자비용 단독 계정이 없다."""
+    lines = [
+        AccountLine(sj_div="IS", account_id="dart_OperatingIncomeLoss", account_nm="영업이익",
+                    thstrm_amount=32_725_961_000_000.0),
+        AccountLine(sj_div="IS", account_id="ifrs-full_FinanceCosts", account_nm="금융비용",
+                    thstrm_amount=12_985_684_000_000.0),
+    ]
+    if with_cash_flow:
+        lines.append(AccountLine(
+            sj_div="CF", account_id="ifrs-full_InterestPaidClassifiedAsOperatingActivities",
+            account_nm="이자의 지급", thstrm_amount=675_049_000_000.0,
+        ))
+    return normalize_statements(RawStatements(
+        corp_code="00126380", bsns_year=2024, reprt_code=ReportCode.ANNUAL,
+        fs_div=FsDiv.CFS, lines=lines,
+    ))
+
+
+def test_samsung_regression_uses_interest_paid_not_finance_costs():
+    m = get(checkup(_samsung_2024(with_cash_flow=True)), "interest_coverage")
+    assert m.value == pytest.approx(48.48, abs=0.01)
+    assert m.signal is Signal.GREEN, "2.52배 🟡 는 외환손실을 이자로 센 결과였다"
+
+
+def test_samsung_without_cash_flow_line_is_not_judged():
+    m = get(checkup(_samsung_2024(with_cash_flow=False)), "interest_coverage")
+    assert m.value == pytest.approx(2.52, abs=0.01)
+    assert m.signal is Signal.NEUTRAL

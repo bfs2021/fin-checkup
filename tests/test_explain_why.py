@@ -11,7 +11,7 @@ from fin_checkup.metrics.engine import checkup
 from fin_checkup.metrics.peers import PeerScope, PeerStat, SelfDelta
 from fin_checkup.metrics.sector import Sector
 from fin_checkup.metrics.signals import Signal
-from fin_checkup.models import Financials, FsDiv, ReportCode
+from fin_checkup.models import Financials, FsDiv, InterestSource, ReportCode
 
 
 def fin(year: int = 2024, **kwargs) -> Financials:
@@ -286,3 +286,33 @@ def test_profit_without_cash_fact_is_appended():
 def test_loss_with_cash_outflow_has_no_extra_fact():
     m = metric("operating_cash_flow", dict(operating_cash_flow=-10e8, net_income=-5e8))
     assert why_color(m) == "영업활동현금흐름 -10억원은 0 미만이라 🔴 위험이에요."
+
+
+# ── 이자보상배율의 분모 출처 ───────────────────────────────────────
+
+
+def test_finance_cost_proxy_says_why_it_is_not_judged():
+    m = metric("interest_coverage", dict(operating_income=50, interest_expense=100,
+                                         interest_expense_source=InterestSource.FINANCE_COSTS))
+    text = why_color(m)
+    assert m.signal is Signal.NEUTRAL
+    assert "0.50배는" in text and "⚪ 측정값" in text and "금융원가" in text
+    assert "업종마다 차이가 커서" not in text, "회전율용 문장을 쓰면 이유가 거짓이 된다"
+    assert banned.find(text) == []
+
+
+def test_cash_flow_source_is_stated_and_debt_free_rule_is_not():
+    m = metric("interest_coverage", dict(operating_income=500, interest_expense=100,
+                                         interest_expense_source=InterestSource.CASH_FLOW))
+    text = why_color(m)
+    assert m.signal is Signal.GREEN
+    assert "3배 이상이라" in text and "현금흐름표의 이자 지급액 기준" in text
+    assert "빚이 없다" not in text, "무차입 규칙은 이자비용 0 일 때만이다"
+
+
+def test_cash_flow_source_is_stated_when_red():
+    m = metric("interest_coverage", dict(operating_income=50, interest_expense=100,
+                                         interest_expense_source=InterestSource.CASH_FLOW))
+    text = why_color(m)
+    assert m.signal is Signal.RED
+    assert "1배 미만이라" in text and "현금흐름표의 이자 지급액 기준" in text
