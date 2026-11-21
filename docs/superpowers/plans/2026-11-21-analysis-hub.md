@@ -39,7 +39,7 @@
 | U3 | "왜 이 색" 한 문장 — 값·경계값·업종 분위수 (`explain/why.py` `why_color`) | ☑ |
 | U4 | 위험 신호 해설 (`explain/redflags.py`) | ☑ |
 | U5 | 위험 공시 유형 해설 (`explain/disclosures.py`) | ☑ |
-| U6 | 용어집 | ☐ |
+| U6 | 용어집 60개 (`explain/glossary.py`) | ☑ |
 | U7 | 재무제표 처음 읽기 가이드 | ☐ |
 | U8 | 업종별 읽는 법 (금융·보험·지주 ⊘) | ☐ |
 
