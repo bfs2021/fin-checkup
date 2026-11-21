@@ -1,0 +1,35 @@
+{#
+  위험 공시 유형 해설 `/learn/disclosures/`. 넘길 값: kinds(explain.DisclosureExplainer 목록), how_to_read(HOW_TO_READ_ON_DART).
+  앵커는 RiskKind 값. 알림 강도(🚨 등)는 싣지 않는다 — 긴급하게 읽히는 표시는 쓰지 않는다.
+#}
+{% extends "base.html" %}
+{% block title %}위험 공시 유형 해설 — 유상증자·감자·감사의견·CB · fin-checkup{% endblock %}
+{% block description %}부도·관리종목·감사보고서·감자·CB/BW·유상증자·최대주주 변동·임원 소유 변동 공시가 무엇이고, DART 원문에서 어디를 보는지.{% endblock %}
+{% block main %}
+<article class="fc-learn">
+  <p class="fc-basis"><a href="{{ url('learn/') }}">배우기</a></p>
+  <h1>위험 공시 유형 해설</h1>
+  <p class="fc-lead">fin-checkup 이 공시 제목을 보고 '위험 공시'로 분류하는 {{ kinds | length }}가지 유형이에요. 공시가 무엇이고 주주와 보통 어떤 구조로 이어지는지까지만 적었어요. 실제 내용은 언제나 DART 원문으로 확인해 주세요.</p>
+
+  <section class="fc-section" id="how-to-read" aria-labelledby="how-title">
+    <h2 id="how-title">DART 원문 보는 법</h2>
+    <ol>
+      {% for line in how_to_read %}
+      <li>{{ line }}</li>
+      {% endfor %}
+    </ol>
+  </section>
+
+  {% for k in kinds %}
+  <section class="fc-section" id="{{ k.kind.value }}" aria-labelledby="{{ k.kind.value }}-title">
+    <h2 id="{{ k.kind.value }}-title">{{ k.label }}</h2>
+    <dl class="fc-explain-list">
+      <dt>무슨 공시인가요</dt><dd>{{ k.what }}</dd>
+      <dt>주주와는 어떻게 이어지나요</dt><dd>{{ k.shareholder_meaning }}</dd>
+      <dt>원문에서 먼저 볼 곳</dt><dd>{{ k.where_to_look }}</dd>
+      <dt>공시 제목 예</dt><dd>{% for title in k.example_titles %}<code>{{ title }}</code>{% if not loop.last %} · {% endif %}{% endfor %}</dd>
+    </dl>
+  </section>
+  {% endfor %}
+</article>
+{% endblock %}

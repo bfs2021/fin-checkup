@@ -1,0 +1,34 @@
+{#
+  용어집 `/learn/glossary/`. 넘길 값: sections(learn.TermSection 목록). 앵커는 GlossaryTerm.slug.
+#}
+{% extends "base.html" %}
+{% block title %}재무 용어집 — 재무제표에서 처음 만나는 말 · fin-checkup{% endblock %}
+{% block description %}재무상태표·영업이익·자본잠식·유상증자·연결재무제표 등 재무제표와 공시에서 처음 만나는 말을 한 줄로 풀었습니다.{% endblock %}
+{% block main %}
+<article class="fc-learn">
+  <p class="fc-basis"><a href="{{ url('learn/') }}">배우기</a></p>
+  <h1>용어집</h1>
+  <p class="fc-lead">화면에서 처음 만나는 말을 한 줄로 풀었어요. 회계 기준의 세세한 예외까지 담지는 않았어요 — 틀리게 줄이기보다 덜 말하는 쪽을 골랐어요.</p>
+  <nav class="fc-section" aria-label="용어집 묶음">
+    <ul class="fc-toc">
+      {% for sec in sections %}
+      <li><a href="#sec-{{ loop.index }}">{{ sec.title }}</a></li>
+      {% endfor %}
+    </ul>
+  </nav>
+  {% for sec in sections %}
+  <section class="fc-section" id="sec-{{ loop.index }}" aria-labelledby="sec-{{ loop.index }}-title">
+    <h2 id="sec-{{ loop.index }}-title">{{ sec.title }}</h2>
+    <dl class="fc-terms">
+      {% for v in sec.terms %}
+      <dt id="{{ v.t.slug }}">{{ v.t.term }}{% if v.t.aliases %} <small>({{ v.t.aliases | join(", ") }})</small>{% endif %}</dt>
+      <dd>{{ v.t.definition }}
+        {% if v.links %}<br><small>관련: {% for l in v.links %}<a href="{{ url(l.path) }}">{{ l.text }}</a>{% if not loop.last %} · {% endif %}{% endfor %}</small>{% endif %}
+        {% if v.see_also %}<br><small>함께 볼 말: {% for s in v.see_also %}<a href="#{{ s.slug }}">{{ s.term }}</a>{% if not loop.last %} · {% endif %}{% endfor %}</small>{% endif %}
+      </dd>
+      {% endfor %}
+    </dl>
+  </section>
+  {% endfor %}
+</article>
+{% endblock %}

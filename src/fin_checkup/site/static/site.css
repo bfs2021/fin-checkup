@@ -306,6 +306,11 @@ h3 { font-size: .9rem; color: var(--ink-muted); margin: 1.2rem 0 .5rem; letter-s
 .fc-terms dt { font-weight: 600; margin-top: .5rem; }
 .fc-terms dd { margin: .1rem 0 0; }
 .fc-metric-label a { color: inherit; }
+.fc-guides { margin: 0; padding-left: 1.3rem; display: grid; gap: .45rem; }
+.fc-explain-list dt { font-weight: 600; margin-top: .6rem; }
+.fc-explain-list dd { margin: .15rem 0 0; }
+.fc-toc { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: .3rem .9rem; }
+.fc-guide h3 { margin-top: 1.1rem; }
 
 /* ── 넓은 화면 ───────────────────────────────────────── */
 
