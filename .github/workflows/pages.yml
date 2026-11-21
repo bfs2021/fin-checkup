@@ -91,6 +91,13 @@ jobs:
           uv run python -m zipfile -e "${zips[0]}" _snapshot/files
           uv run python -m fin_checkup.cli snapshot import _snapshot/files --db "$FIN_CHECKUP_DB_PATH"
 
+      # 스냅샷의 metric_values 는 그걸 만든 시점 코드의 계산 결과다. 지표 계산을 고친 PR 이 병합돼도
+      # 스냅샷을 다시 올리기 전까지 대조군(동종업계 분포)이 옛 계산으로 남는다 — 배포마다 지금 코드로
+      # 다시 계산한다. 원본 재무(statement_lines)만 읽고 DART 는 부르지 않는다.
+      - name: 지표 값 다시 계산 (지금 코드 기준)
+        if: steps.snapshot.outputs.found == 'true'
+        run: uv run python -m fin_checkup.cli backfill --years 5
+
       - name: 최근 위험 공시 (DART_API_KEY 가 있을 때만)
         id: disclosures
         if: steps.snapshot.outputs.found == 'true'
