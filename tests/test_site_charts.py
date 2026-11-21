@@ -9,6 +9,7 @@ from datetime import date
 import pytest
 from hub_seed import KB, SAMSUNG, seed_site_cache
 
+from fin_checkup.disclaimer import DISCLAIMER
 from fin_checkup.metrics.engine import MONEY, Category, Metric
 from fin_checkup.metrics.peers import PeerScope, PeerStat, peer_stats
 from fin_checkup.metrics.signals import Band, Signal
@@ -17,6 +18,8 @@ from fin_checkup.site.charts import (
     Gap,
     TrendPoint,
     TrendSeries,
+    badge_label,
+    badge_svg,
     nice_ticks,
     peer_strip,
     peer_strips,
@@ -325,3 +328,56 @@ async def test_metric_card_renders_the_strip_inside_it(checkups):
         .render(m=type("M", (), {"key": "roe"}), peer_strips=strips)
     )
     assert empty.strip() == ""
+
+
+# ── 임베드 배지 ───────────────────────────────────────────────────
+
+
+COUNTS = {Signal.GREEN: 9, Signal.YELLOW: 4, Signal.RED: 2, Signal.NOT_APPLICABLE: 1, Signal.UNKNOWN: 1}
+
+
+def test_badge_shows_signal_counts_and_fiscal_year_not_a_score():
+    svg = badge_svg(COUNTS, 2025, company="기아")
+    root = parse(svg)
+    assert badge_label(COUNTS, 2025) == "fin-checkup | 🟢9 🟡4 🔴2 ⊘1 ⚫1 · 2025"
+    assert "🟢9 🟡4 🔴2 ⊘1 ⚫1 · 2025" in root.find(f"{SVG}title").text
+    visible = [t.text for t in root.iter(f"{SVG}text")]
+    assert visible == ["fin-checkup", "9", "4", "2", "1", "1", "· DART 2025"]
+    lowered = svg.lower()
+    for score in ("점수:", "점)", "/100", "score", "등급", "grade", "평균", "종합"):
+        assert score not in lowered, f"배지에 종합 점수처럼 읽히는 '{score}'"
+    assert "점수 아님" in root.find(f"{SVG}desc").text
+
+
+def test_badge_is_self_contained_with_disclaimer_and_source():
+    svg = badge_svg(COUNTS, 2024)
+    desc = parse(svg).find(f"{SVG}desc").text
+    assert DISCLAIMER in desc and "DART" in desc
+    assert "<script" not in svg and "href" not in svg and "var(" not in svg
+
+
+def test_badge_hides_empty_secondary_signals_but_keeps_primary_zero():
+    labels = badge_label({Signal.GREEN: 17}, 2024)
+    assert labels == "fin-checkup | 🟢17 🟡0 🔴0 · 2024"
+
+
+def test_badge_escapes_company_name():
+    svg = badge_svg(COUNTS, 2024, company='<b>"악성" & co</b>')
+    assert "<b>" not in svg
+    assert '<b>"악성" & co</b>' in parse(svg).find(f"{SVG}title").text
+
+
+async def test_build_writes_a_badge_per_company_and_an_embed_snippet(cache, tmp_path):
+    out = tmp_path / "out"
+    await build_site(cache, out, 2024, built_on=date(2026, 11, 21), base_url="https://example.org/fc/")
+    badge = (out / "badge" / f"{SAMSUNG.stock_code}.svg").read_text(encoding="utf-8")
+    parse(badge)
+    assert "· DART 2024" in badge
+    html = (out / "c" / SAMSUNG.stock_code / "index.html").read_text(encoding="utf-8")
+    assert 'id="embed"' in html and "블로그에 붙이기" in html
+    assert 'src="../../badge/005930.svg"' in html
+    md = "[![fin-checkup 삼성전자 2024 재무 신호등](https://example.org/fc/badge/005930.svg)](https://example.org/fc/c/005930/)"
+    assert md in html
+    assert "&lt;a href=&#34;https://example.org/fc/c/005930/&#34;&gt;" in html or (
+        "&lt;a href=&quot;https://example.org/fc/c/005930/&quot;&gt;" in html
+    )

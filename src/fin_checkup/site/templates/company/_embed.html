@@ -1,0 +1,10 @@
+{# 블로그에 붙이기 — 배지(/badge/<코드>.svg)와 붙이는 코드. 배지는 신호 개수일 뿐 점수가 아니다. #}
+<section class="fc-section" id="embed" aria-labelledby="embed-title">
+  <h2 id="embed-title">블로그에 붙이기</h2>
+  <p><img class="fc-badge" src="{{ url(badge_path) }}" alt="{{ badge_alt }}"></p>
+  <p class="fc-hint">신호 개수와 사업연도만 담은 배지입니다(종합 점수가 아닙니다). 아래 코드는 배지를 이 페이지로 연결해, 읽는 사람이 계산식과 경계값을 확인할 수 있게 합니다.</p>
+  <h3>마크다운</h3>
+  <pre class="fc-code-block"><code>{{ embed_markdown }}</code></pre>
+  <h3>HTML</h3>
+  <pre class="fc-code-block"><code>{{ embed_html }}</code></pre>
+</section>

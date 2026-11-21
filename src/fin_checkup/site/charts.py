@@ -23,12 +23,14 @@ from html import escape
 
 from markupsafe import Markup
 
+from fin_checkup.disclaimer import DISCLAIMER
 from fin_checkup.format import chart_scale, format_metric, format_money
 from fin_checkup.metrics.engine import MONEY, Metric, checkup
 from fin_checkup.metrics.peers import PeerStat
 from fin_checkup.metrics.signals import Band, Signal
 from fin_checkup.models import Financials
 from fin_checkup.service import Checkup
+from fin_checkup.theme import SIGNAL_COLORS
 
 #: 추이에 그릴 금액 계정 (Financials 필드, 이름). 순서가 화면 순서다.
 AMOUNT_SERIES: tuple[tuple[str, str], ...] = (
@@ -481,3 +483,111 @@ def peer_strips(data: Checkup) -> dict[str, PeerStrip]:
         if strip is not None:
             strips[metric.key] = strip
     return strips
+
+
+# ── 임베드 배지 ───────────────────────────────────────────────────
+
+#: 배지는 다른 사이트에 <img> 로 붙는 독립 SVG 파일이라 CSS 변수를 못 쓴다. 색을 박는다.
+#: 신호색은 theme.SIGNAL_COLORS(밝은 모드)와 같다.
+_BADGE_LEFT_BG = "#3b3b38"
+_BADGE_RIGHT_BG = "#f7f7f5"
+_BADGE_INK = "#1b1b19"
+_BADGE_BORDER = "#d4d4cf"
+#: 배지에 싣는 순서 — 정상·주의·위험은 늘, 측정값·해당 없음·데이터 없음은 있을 때만.
+BADGE_ORDER = (
+    Signal.GREEN,
+    Signal.YELLOW,
+    Signal.RED,
+    Signal.NEUTRAL,
+    Signal.NOT_APPLICABLE,
+    Signal.UNKNOWN,
+)
+_ALWAYS = {Signal.GREEN, Signal.YELLOW, Signal.RED}
+
+
+def _badge_text_width(text: str) -> float:
+    """11px 산세리프 글자 폭 어림. textLength 로 실제 렌더를 이 폭에 맞추므로 크게 어긋나지 않는다."""
+    width = 0.0
+    for ch in text:
+        if ch.isdigit():
+            width += 6.6
+        elif ch == " ":
+            width += 3.3
+        elif ch in "·.-|":
+            width += 3.6
+        elif ord(ch) > 0x2E80:  # 한글·한자
+            width += 11.0
+        else:
+            width += 6.4
+    return width
+
+
+def badge_counts(counts: dict[Signal, int]) -> list[tuple[Signal, int]]:
+    return [(s, counts.get(s, 0)) for s in BADGE_ORDER if s in _ALWAYS or counts.get(s, 0)]
+
+
+def badge_label(counts: dict[Signal, int], year: int) -> str:
+    """'fin-checkup | 🟢9 🟡4 🔴2 ⊘1 ⚫1 · 2024' — 배지가 말하는 전부. 점수가 아니라 개수다."""
+    chips = " ".join(f"{s.emoji}{n}" for s, n in badge_counts(counts))
+    return f"fin-checkup | {chips} · {year}"
+
+
+def _badge_dot(signal: Signal, cx: float, cy: float, colors: dict[Signal, str]) -> str:
+    r = 4.5
+    if signal is Signal.NOT_APPLICABLE:  # ⊘ — 빈 원 + 사선
+        return (
+            f'<circle cx="{cx:.1f}" cy="{cy}" r="{r - 0.6}" fill="none" stroke="{colors[signal]}" '
+            f'stroke-width="1.2"/><path d="M{cx - 3:.1f},{cy + 3}L{cx + 3:.1f},{cy - 3}" '
+            f'stroke="{colors[signal]}" stroke-width="1.2"/>'
+        )
+    if signal is Signal.NEUTRAL:  # ⚪ — 흰 원 + 테두리
+        return (
+            f'<circle cx="{cx:.1f}" cy="{cy}" r="{r - 0.5}" fill="#ffffff" '
+            f'stroke="{colors[signal]}" stroke-width="1"/>'
+        )
+    return f'<circle cx="{cx:.1f}" cy="{cy}" r="{r}" fill="{colors[signal]}"/>'
+
+
+def badge_svg(counts: dict[Signal, int], year: int, company: str = "") -> str:
+    """블로그에 붙이는 배지 — 신호 개수와 사업연도. 종합 점수·등급·순위는 없다(REGULATORY.md).
+
+    `<img>` 로 다른 사이트에 붙으므로 그 자체로 완결된 SVG 문서이고, 면책 문구와 출처를 `<desc>` 에 싣는다.
+    """
+    colors = {s: SIGNAL_COLORS[s] for s in BADGE_ORDER}
+    height, pad, cy = 20, 7, 10
+    left_text = "fin-checkup"
+    left_w = _badge_text_width(left_text) + pad * 2
+
+    pieces: list[str] = []
+    x = left_w + pad
+    for signal, n in badge_counts(counts):
+        pieces.append(_badge_dot(signal, x + 4.5, cy, colors))
+        x += 9 + 2
+        text = str(n)
+        tw = _badge_text_width(text)
+        pieces.append(
+            f'<text x="{x:.1f}" y="14" textLength="{tw:.1f}" lengthAdjust="spacingAndGlyphs">{text}</text>'
+        )
+        x += tw + 6
+    tail = f"· DART {year}"
+    tw = _badge_text_width(tail)
+    pieces.append(
+        f'<text x="{x:.1f}" y="14" textLength="{tw:.1f}" lengthAdjust="spacingAndGlyphs">{_esc(tail)}</text>'
+    )
+    width = x + tw + pad
+
+    label = badge_label(counts, year)
+    title = f"{company} {year} 재무 신호등 — {label}" if company else label
+    desc = f"{year} 사업연도 신호 개수(점수 아님). 출처: 금융감독원 전자공시시스템(DART). {DISCLAIMER}"
+    return (
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{width:.0f}" height="{height}" '
+        f'viewBox="0 0 {width:.1f} {height}" role="img" aria-label="{_esc(title)}">'
+        f"<title>{_esc(title)}</title><desc>{_esc(desc)}</desc>"
+        f'<rect width="{width:.1f}" height="{height}" rx="3" fill="{_BADGE_RIGHT_BG}" '
+        f'stroke="{_BADGE_BORDER}"/>'
+        f'<path d="M3,0H{left_w:.1f}V{height}H3a3,3 0 0 1-3-3V3a3,3 0 0 1 3-3z" fill="{_BADGE_LEFT_BG}"/>'
+        f'<g font-family="Verdana,DejaVu Sans,Geneva,sans-serif" font-size="11">'
+        f'<text x="{pad}" y="14" fill="#ffffff" textLength="{left_w - pad * 2:.1f}" '
+        f'lengthAdjust="spacingAndGlyphs">{left_text}</text>'
+        f'<g fill="{_BADGE_INK}">{"".join(pieces)}</g></g></svg>\n'
+    )
