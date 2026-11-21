@@ -15,6 +15,15 @@ from fin_checkup.format import format_money
 from fin_checkup.metrics.sector import Sector
 from fin_checkup.models import Financials
 
+#: 판정 경계. 해설(explain.redflags)이 이 값을 그대로 문장에 옮긴다 — 여기만 고치면 된다.
+#: 자본잠식률이 이 % 이상이면 부분 자본잠식 신호.
+IMPAIRMENT_RATE_MIN = 50
+#: 영업손실이 이 해 수 이상 이어지면 신호.
+LOSS_STREAK_MIN = 3
+#: 영업이익 ÷ 이자비용이 이 값 미만인 해가 ZOMBIE_STREAK_MIN 해 이상 이어지면 신호.
+ZOMBIE_COVERAGE_MAX = 1
+ZOMBIE_STREAK_MIN = 3
+
 
 @dataclass(frozen=True)
 class RedFlag:
@@ -54,11 +63,11 @@ def detect_red_flags(
                 "완전자본잠식은 상장폐지 사유에 해당한다.",
             )
         )
-    elif (rate := latest.capital_impairment_rate) is not None and rate >= 50:
+    elif (rate := latest.capital_impairment_rate) is not None and rate >= IMPAIRMENT_RATE_MIN:
         flags.append(
             RedFlag(
                 "partial_capital_impairment",
-                "자본잠식률 50% 이상",
+                f"자본잠식률 {IMPAIRMENT_RATE_MIN}% 이상",
                 f"{latest.bsns_year}년 자본잠식률이 {rate:.1f}%다.",
                 "자본잠식률 50% 이상은 관리종목 지정 요건 중 하나다.",
             )
@@ -66,7 +75,7 @@ def detect_red_flags(
 
     # 연속 영업손실
     streak = _trailing_loss_streak(ordered)
-    if streak >= 3:
+    if streak >= LOSS_STREAK_MIN:
         flags.append(
             RedFlag(
                 "consecutive_operating_loss",
@@ -94,11 +103,11 @@ def detect_red_flags(
 
     # 이자보상배율 1 미만 연속
     zombie = 0 if sector is Sector.FINANCIAL else _trailing_zombie_streak(ordered)
-    if zombie >= 3:
+    if zombie >= ZOMBIE_STREAK_MIN:
         flags.append(
             RedFlag(
                 "zombie_streak",
-                f"{zombie}년 연속 이자보상배율 1 미만",
+                f"{zombie}년 연속 이자보상배율 {ZOMBIE_COVERAGE_MAX} 미만",
                 f"{ordered[-zombie].bsns_year}~{latest.bsns_year}년 영업이익이 "
                 "이자비용에 미치지 못했다.",
             )
@@ -123,7 +132,7 @@ def _trailing_zombie_streak(ordered: list[Financials]) -> int:
         op, interest = fin.operating_income, fin.interest_expense
         if op is None or interest is None or interest == 0:
             break
-        if op / interest < 1:
+        if op / interest < ZOMBIE_COVERAGE_MAX:
             streak += 1
         else:
             break
