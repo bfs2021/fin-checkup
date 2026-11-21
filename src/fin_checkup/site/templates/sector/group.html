@@ -1,0 +1,50 @@
+{#
+  업종 페이지 하나. 넘길 값: group(sector.GroupLink), members(이름순), sectors(적용된 판정 기준), blocks, caveats, min_peers.
+#}
+{% extends "base.html" %}
+{% block title %}{{ group.info.name }} 업종 {{ site.year }} 재무 지표 분포 · fin-checkup{% endblock %}
+{% block description %}{{ group.info.name }}(KSIC {{ group.info.code }}) 상장사 {{ group.count }}곳의 {{ site.year }} 사업연도 재무 지표 분포(1사분위·중앙값·3사분위)와 계산식·경계값, 소속 회사 이름순 목록.{% endblock %}
+{% block main %}
+<article class="fc-sector">
+  <header class="fc-summary">
+    <p class="fc-basis"><a href="{{ url('s/') }}">업종</a> · KSIC {{ group.info.code }}</p>
+    <h1>{{ group.info.name }}</h1>
+    <p class="fc-lead">{{ group.info.plain }}. 이 사이트에 페이지가 있는 상장사 {{ group.count }}곳입니다.</p>
+    <p class="fc-basis">{{ site.year }} 사업연도 · {{ sectors | map(attribute="label") | join("·") }} 기준으로 판정</p>
+    {% if group.info.mixed_note %}<p class="fc-notice">{{ group.info.mixed_note }}</p>{% endif %}
+    {% if group.count < min_peers %}
+    <p class="fc-notice">회사가 {{ group.count }}곳뿐이라 업종 분포를 내지 않습니다. 회사 페이지는 이런 업종의 지표를 전체 상장사와 견줍니다.</p>
+    {% endif %}
+  </header>
+
+  <section class="fc-section" id="about" aria-labelledby="how-title">
+    <h2 id="how-title">이 묶음은</h2>
+    <p>DART 기업개황의 업종코드 앞 두 자리가 {{ group.info.code }}인 회사입니다. 다섯 자리 그대로 묶으면 업종이 너무 잘게 쪼개져 견줄 회사가 모자라서, 조금 굵게 묶었습니다. 그래서 하는 일이 꽤 다른 회사가 한 묶음에 들어 있을 수 있습니다.</p>
+    {% if caveats %}
+    <p>금융업·부동산업 기준으로 판정하는 회사에는 아래 지표로 판정하지 않습니다(⊘ 해당 없음).</p>
+    <ul class="fc-caveats">
+      {% for cv in caveats %}
+      <li><b>{{ cv.label }}</b> — {{ cv.why }} <br><small>대신 볼 것: {{ cv.instead }}</small></li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+  </section>
+
+  {% if group.count >= min_peers %}
+  <section class="fc-section" id="distribution" aria-labelledby="dist-title">
+    <h2 id="dist-title">지표 분포</h2>
+    <p class="fc-hint">가운데 절반의 회사가 1사분위와 3사분위 사이에 있습니다. 분포는 측정 결과일 뿐 좋고 나쁨의 기준이 아닙니다 — 판정 경계값은 지표마다 따로 적었습니다.</p>
+    {% with show_signals=False %}{% include "_distribution.html" %}{% endwith %}
+  </section>
+  {% endif %}
+
+  <section class="fc-section" id="members" aria-labelledby="members-title">
+    <h2 id="members-title">소속 회사 {{ group.count }}곳 <small>(이름순)</small></h2>
+    <ul class="fc-members">
+      {% for e in members %}
+      <li><a href="{{ url(e.path) }}">{{ e.name }}</a> <span class="fc-code">{{ e.stock_code }}</span></li>
+      {% endfor %}
+    </ul>
+  </section>
+</article>
+{% endblock %}

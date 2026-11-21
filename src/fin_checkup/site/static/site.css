@@ -252,6 +252,22 @@ h3 { font-size: .9rem; color: var(--ink-muted); margin: 1.2rem 0 .5rem; letter-s
 .fc-table-view th[scope="row"], .fc-table-view thead th:first-child { text-align: left; }
 .fc-table-view td.muted { color: var(--ink-muted); }
 
+/* ── 업종·분포 (sector/, market/, _distribution.html) ─── */
+
+.fc-dist .fc-metric { border-left-color: var(--border); }
+.fc-dist-count { margin-left: auto; color: var(--ink-muted); font-size: .85rem; font-variant-numeric: tabular-nums; }
+.fc-dist-stats {
+  display: grid; grid-template-columns: repeat(3, auto); justify-content: start; gap: 0 1.2rem;
+  margin: .4rem 0; font-variant-numeric: tabular-nums;
+}
+.fc-dist-stats dt { grid-row: 1; color: var(--ink-muted); font-size: .78rem; }
+.fc-dist-stats dd { grid-row: 2; margin: 0; }
+.fc-shares { list-style: none; padding: 0; margin: .3rem 0; display: flex; flex-wrap: wrap; gap: .2rem .7rem; font-size: .82rem; }
+.fc-shares li { border-left: 3px solid var(--sig, var(--border)); padding-left: .35rem; }
+.fc-sector-list, .fc-members { list-style: none; padding: 0; margin: 0; display: grid; gap: .3rem 1rem; }
+.fc-members .fc-code, .fc-sector-list small { color: var(--ink-muted); }
+.fc-caveats { margin: .3rem 0 0; padding-left: 1.1rem; font-size: .9rem; }
+
 /* ── 넓은 화면 ───────────────────────────────────────── */
 
 @media (min-width: 40rem) {
@@ -259,6 +275,7 @@ h3 { font-size: .9rem; color: var(--ink-muted); margin: 1.2rem 0 .5rem; letter-s
   .fc-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .fc-trend-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.2rem 1.6rem; }
   .fc-section { padding: 1.2rem 1.4rem; }
+  .fc-sector-list, .fc-members { grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr)); }
 }
 
 @media print {

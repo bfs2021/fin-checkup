@@ -1,0 +1,41 @@
+{#
+  지표별 분포 카드. 업종 페이지·시장 전체 페이지가 함께 쓴다.
+  넘길 값: blocks(sector.MetricBlock 목록), min_peers, show_signals(신호 비율 표시 여부).
+  값으로 회사를 고르거나 줄 세우지 않는다 — 여기엔 회사 이름이 없다.
+#}
+<ul class="fc-metrics fc-dist">
+  {% for b in blocks %}
+  {% set d = b.dist %}
+  <li class="fc-metric" id="d-{{ d.key }}">
+    <div class="fc-metric-head">
+      <a class="fc-metric-label" href="{{ url(b.explainer_path) }}">{{ d.spec.label }}</a>
+      <span class="fc-dist-count">{{ d.count }}곳</span>
+    </div>
+    {% if d.enough %}
+    <dl class="fc-dist-stats">
+      <dt>1사분위</dt><dd>{{ d.text(d.q1) }}</dd>
+      <dt>중앙값</dt><dd><b>{{ d.text(d.median) }}</b></dd>
+      <dt>3사분위</dt><dd>{{ d.text(d.q3) }}</dd>
+    </dl>
+    {% else %}
+    <p class="fc-note">값이 있는 회사가 {{ d.count }}곳이라({{ min_peers }}곳 미만) 분포를 내지 않습니다.</p>
+    {% endif %}
+    {% if show_signals %}
+    <ul class="fc-shares" aria-label="{{ d.spec.label }} 신호 비율">
+      {% for s in d.signals %}
+      <li class="sig-{{ s.signal.value }}"><span aria-hidden="true">{{ s.signal.emoji }}</span> {{ s.signal.label }} {{ s.percent }}% <small>({{ s.count }}곳)</small></li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+    <dl class="fc-basis-list">
+      <dt>계산식</dt><dd>{{ d.spec.formula }}</dd>
+      {% for t in b.thresholds %}
+      <dt>경계값{% if t.sector_label %} ({{ t.sector_label }}){% endif %}</dt><dd>{{ t.text }}</dd>
+      {% endfor %}
+    </dl>
+    {% if d.excluded_text %}
+    <p class="fc-note">분포에서 뺀 회사: {{ d.excluded_text }} (전체 {{ d.total }}곳). 없는 값을 0으로 세지 않습니다.</p>
+    {% endif %}
+  </li>
+  {% endfor %}
+</ul>
