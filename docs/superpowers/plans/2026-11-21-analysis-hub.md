@@ -35,7 +35,7 @@
 | # | PR | 상태 |
 |---|---|---|
 | U1 | 지표 해설 데이터 17개 (`explain/metrics.py` — `site/` 가 아니라 UI 무관 패키지 `fin_checkup.explain` 로 옮김: 사이트·Streamlit·CLI 공용) | ☑ |
-| U2 | 지표 해설 페이지 `/m/<지표>/` (색과 무관한 예시 회사 규칙) | ☐ |
+| U2 | 지표 해설 페이지 `/m/<지표>/` (색과 무관한 예시 회사 규칙) | ☑ |
 | U3 | "왜 이 색" 한 문장 — 값·경계값·업종 분위수 (`explain/why.py` `why_color`) | ☑ |
 | U4 | 위험 신호 해설 (`explain/redflags.py`) | ☑ |
 | U5 | 위험 공시 유형 해설 (`explain/disclosures.py`) | ☑ |

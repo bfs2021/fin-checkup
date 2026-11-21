@@ -294,6 +294,19 @@ h3 { font-size: .9rem; color: var(--ink-muted); margin: 1.2rem 0 .5rem; letter-s
 .fc-members .fc-code, .fc-sector-list small { color: var(--ink-muted); }
 .fc-caveats { margin: .3rem 0 0; padding-left: 1.1rem; font-size: .9rem; }
 
+/* ── 해설·배우기 (/m/ · /learn/) ──────────────────────── */
+
+.fc-metric-index { list-style: none; padding: 0; margin: 0; display: grid; gap: .55rem; }
+.fc-metric-index small { color: var(--ink-muted); }
+.fc-rules { list-style: none; padding: 0; margin: .3rem 0; display: grid; gap: .3rem; font-size: .92rem; }
+.fc-rules li { border-left: 3px solid var(--sig, var(--border)); padding-left: .5rem; }
+.fc-explainer .fc-caveats { list-style: none; padding: 0; }
+.fc-explainer .fc-caveats li { border-left: 3px solid var(--sig, var(--border)); padding-left: .5rem; margin: .4rem 0; }
+.fc-worked dd { font-variant-numeric: tabular-nums; }
+.fc-terms dt { font-weight: 600; margin-top: .5rem; }
+.fc-terms dd { margin: .1rem 0 0; }
+.fc-metric-label a { color: inherit; }
+
 /* ── 넓은 화면 ───────────────────────────────────────── */
 
 @media (min-width: 40rem) {

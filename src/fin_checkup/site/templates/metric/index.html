@@ -1,0 +1,23 @@
+{#
+  지표 해설 목록 `/m/`. 넘길 값: groups(metric.IndexGroup 목록), metric_path.
+  순서는 엔진 정의 순서(회사 페이지와 같다) — 값이나 색으로 줄 세우지 않는다.
+#}
+{% extends "base.html" %}
+{% block title %}재무 지표 17개 쉽게 읽기 · fin-checkup{% endblock %}
+{% block description %}영업이익률·부채비율·ROE 등 재무 지표 17개가 무엇을 뜻하는지, 계산식과 신호등 경계값, 업종별로 판정하지 않는 경우를 쉬운 말로 풀었습니다.{% endblock %}
+{% block main %}
+<article class="fc-learn">
+  <h1>재무 지표 17개 쉽게 읽기</h1>
+  <p class="fc-lead">회사 페이지의 신호등 한 칸 한 칸이 무엇을 재는지 풀어 둔 곳이에요. 지표마다 계산식, 경계값, 그 숫자의 함정, 실제 회사 숫자로 계산해 보는 예시가 있어요.</p>
+  {% for g in groups %}
+  <section class="fc-section" aria-labelledby="cat-{{ loop.index }}">
+    <h2 id="cat-{{ loop.index }}">{{ g.category }}</h2>
+    <ul class="fc-metric-index">
+      {% for e in g.items %}
+      <li><a href="{{ url(metric_path(e.key)) }}"><b>{{ e.label }}</b></a> — {{ e.easy_name }}<br><small>{{ e.one_liner }}</small></li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endfor %}
+</article>
+{% endblock %}

@@ -1,0 +1,93 @@
+{#
+  지표 해설 한 개 `/m/<key>/`. 넘길 값: p(metric.MetricPage), rule_text, rounding_note.
+  "실제 숫자로 계산해 보기" 는 계산 과정만 — 결과에 좋다·나쁘다를 붙이지 않고, 판정 색도 여기서 보이지 않는다.
+#}
+{% extends "base.html" %}
+{% set e = p.e %}
+{% block title %}{{ e.label }} — {{ e.easy_name }} · 계산식과 경계값 · fin-checkup{% endblock %}
+{% block description %}{{ e.label }}: {{ e.one_liner }} 계산식 {{ e.formula }}. 신호등 경계값과 업종별 주의점, 실제 회사 숫자로 계산해 보는 예시.{% endblock %}
+{% block main %}
+<article class="fc-learn fc-explainer" id="metric-{{ e.key }}">
+  <header class="fc-summary">
+    <p class="fc-basis"><a href="{{ url('m/') }}">지표 해설</a> · {{ e.category.value }}</p>
+    <h1>{{ e.label }}</h1>
+    <p class="fc-lead"><b>{{ e.easy_name }}</b> — {{ e.one_liner }}</p>
+  </header>
+
+  <section class="fc-section" id="formula" aria-labelledby="formula-title">
+    <h2 id="formula-title">계산식과 경계값</h2>
+    <dl class="fc-basis-list">
+      <dt>계산식</dt><dd>{{ e.formula }}</dd>
+      {% for t in p.thresholds %}
+      <dt>경계값{% if t.sector_label %} ({{ t.sector_label }}){% endif %}</dt><dd>{{ t.text }}</dd>
+      {% endfor %}
+    </dl>
+    <p>{{ e.basis }}</p>
+    {% if p.rules %}
+    <h3>경계값 말고 규칙으로 정하는 경우</h3>
+    <ul class="fc-rules">
+      {% for r in p.rules %}
+      <li class="sig-{{ r.signal.key }}"><span aria-hidden="true">{{ r.signal.emoji }}</span> {{ r.signal.label }} — {{ r.when }}</li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+  </section>
+
+  <section class="fc-section" id="why" aria-labelledby="why-title">
+    <h2 id="why-title">왜 보나요</h2>
+    <p>{{ e.why_look }}</p>
+  </section>
+
+  <section class="fc-section" id="pitfalls" aria-labelledby="pitfalls-title">
+    <h2 id="pitfalls-title">읽을 때 조심할 점</h2>
+    <ul>
+      {% for pf in e.pitfalls %}
+      <li>{{ pf }}</li>
+      {% endfor %}
+    </ul>
+  </section>
+
+  {% if p.caveats %}
+  <section class="fc-section" id="sectors" aria-labelledby="sectors-title">
+    <h2 id="sectors-title">이 지표로 판정하지 않는 업종 <span aria-hidden="true">⊘</span></h2>
+    <ul class="fc-caveats">
+      {% for cv in p.caveats %}
+      <li class="sig-not_applicable"><b><span aria-hidden="true">⊘</span> {{ cv.sector_label }}</b> — {{ cv.why }}<br><small><b>대신 볼 것</b> {{ cv.instead }}</small></li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+
+  <section class="fc-section" id="example" aria-labelledby="example-title">
+    <h2 id="example-title">실제 숫자로 계산해 보기</h2>
+    {% set ex = p.example %}
+    {% if ex %}
+    <p>{% if not ex.is_default %}기본 예시 회사로는 이 지표를 계산할 수 없어서, 아래 규칙에 따라 다른 회사를 썼어요. {% endif %}<a href="{{ url(ex.entry.path) }}">{{ ex.entry.name }}</a>의 {{ ex.worked.year }} 사업연도 공시 숫자예요.</p>
+    <dl class="fc-basis-list fc-worked">
+      {% for i in ex.worked.inputs %}
+      <dt>{{ i.label }}</dt><dd>{{ i.text }} <small>({{ i.year }}년 {{ i.statement }})</small></dd>
+      {% endfor %}
+      <dt>계산</dt><dd>{{ ex.worked.expression }}</dd>
+      <dt>결과</dt><dd><b>{{ ex.worked.result_text }}</b></dd>
+    </dl>
+    <p class="fc-hint">{{ rounding_note }} 이 회사의 신호등과 경계값은 <a href="{{ url(ex.entry.path) }}#m-{{ e.key }}">회사 페이지</a>에서 볼 수 있어요.</p>
+    {% else %}
+    <p>이 사이트의 회사 중에는 이 지표를 계산할 숫자가 모두 공시된 회사가 없어 예시를 싣지 않았어요. 없는 숫자를 0으로 채우지 않아요.</p>
+    {% endif %}
+    <p class="fc-hint">{{ rule_text }}</p>
+  </section>
+
+  {% if p.terms %}
+  <section class="fc-section" id="terms" aria-labelledby="terms-title">
+    <h2 id="terms-title">함께 알아 둘 말</h2>
+    <dl class="fc-terms">
+      {% for t in p.terms %}
+      <dt id="t-{{ t.slug }}">{{ t.term }}</dt><dd>{{ t.definition }}</dd>
+      {% endfor %}
+    </dl>
+  </section>
+  {% endif %}
+
+  <p><a href="{{ url('m/') }}">지표 17개 모두 보기</a></p>
+</article>
+{% endblock %}
