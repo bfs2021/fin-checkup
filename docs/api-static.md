@@ -31,12 +31,13 @@
 |---|---|
 | `key` · `label` · `category` | 지표 키(`debt_ratio` …) · 이름 · 묶음(수익성·안정성 …) |
 | `value` · `unit` | 값과 단위(`%`·`배`·`money`). 금액(`money`)의 통화는 `currency`. **값이 없으면 `null`** — 0 으로 채우지 않는다 |
+| `value_text` | 화면과 같은 표시 문자열(`66.67%`·`1.2조원`). 값이 없으면 `—` |
 | `signal` | `key`(`green`·`yellow`·`red`·`neutral`·`not_applicable`·`unknown`) · `emoji`(🟢🟡🔴⚪⊘⚫) · `label` |
 | `formula` | 계산식 |
 | `thresholds` | `good` · `warn` · `higher_is_better`. 절대 기준이 없거나(⚪) 업종에 맞지 않으면(⊘) `null` |
 | `threshold_text` | 경계값을 한 줄로 (화면과 같은 문장) |
 | `note` | ⊘ 면 대신 볼 것, ⚫ 면 무엇이 없었는지, 그 밖의 판정 메모 |
-| `peer` | 대조군 분포 `scope`(`industry` 동종업계 / `market` 전체 상장사) · `sample_size` · `median` · `percentile`(0~100, 높을수록 그 지표 기준으로 나은 쪽) · `summary`. 표본이 5개사 미만이면 `null` |
+| `peer` | 대조군 분포 `scope`(`industry` 동종업계 / `market` 전체 상장사) · `sample_size` · `median` · `median_text`(표시 문자열) · `percentile`(0~100, 높을수록 그 지표 기준으로 나은 쪽) · `summary`. 표본이 5개사 미만이면 `null` |
 | `delta` | 작년 대비 `previous` · `current` · `improved`(같으면 `null`) · `summary`. 작년 값이 없거나 ⊘ 면 `null` |
 
 판정 규칙·경계값의 근거는 `src/fin_checkup/metrics/engine.py`, 생성 코드는 `src/fin_checkup/site/pages/api.py`.

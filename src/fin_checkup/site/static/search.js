@@ -1,7 +1,9 @@
 /* fin-checkup 검색 — 회사 이름 · 6자리 종목코드 · 초성(ㅅㅅㅈㅈ).
    인덱스(search-index.json)는 처음 입력할 때 한 번 받는다. 링크는 <html data-root> 기준 상대경로라
    GitHub Pages 하위 경로(/fin-checkup/)에서도 그대로 동작한다. 외부 요청·저장·추적 없음.
-   결과 순서는 "얼마나 맞았나 → 이름순" 뿐이다. 지표로 줄 세우지 않는다. */
+   결과 순서는 "얼마나 맞았나 → 이름순" 뿐이다. 지표로 줄 세우지 않는다.
+   <form data-fc-pick> 는 고르기 모드: 회사 페이지로 가지 않고 그 form 에 "fc-pick" 이벤트
+   (detail = {code, name})를 보낸다 — 비교 페이지(compare.js)가 회사를 더할 때 쓴다. */
 (function () {
   "use strict";
 
@@ -61,8 +63,21 @@
     var input = form.querySelector("input[type=search]");
     var list = form.querySelector(".fc-results");
     if (!input || !list) return;
+    var pickMode = form.hasAttribute("data-fc-pick");
     var shown = [];
     var active = -1;
+
+    function choose(item) {
+      if (!pickMode) {
+        window.location.href = hrefOf(item);
+        return;
+      }
+      form.dispatchEvent(new CustomEvent("fc-pick", { detail: { code: item.code, name: item.name } }));
+      input.value = "";
+      shown = [];
+      active = -1;
+      paint();
+    }
 
     function paint() {
       list.textContent = "";
@@ -122,9 +137,20 @@
       load().then(function (items) {
         var hits = search(items, q, 10);
         var pick = hits[Math.max(active, 0)] || hits[0];
-        if (pick) window.location.href = hrefOf(pick);
+        if (pick) choose(pick);
       });
     });
+
+    if (pickMode) {
+      list.addEventListener("click", function (e) {
+        var li = e.target.closest("li");
+        var i = li ? Array.prototype.indexOf.call(list.children, li) : -1;
+        if (i < 0 || !shown[i]) return;
+        e.preventDefault();
+        choose(shown[i]);
+      });
+      return; // 고르기 모드는 ?q= 로 미리 채우지 않는다.
+    }
 
     var initial = new URLSearchParams(window.location.search).get("q");
     if (initial && !input.value) {
