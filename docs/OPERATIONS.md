@@ -237,7 +237,7 @@ uv run python -m fin_checkup.cli budget
 ```
 로컬 수집 (scripts/collect_universe.py)
   → scripts/publish_snapshot.sh            # 허용목록 테이블 → data-YYYYMMDD 릴리스 (snapshot-*.zip + manifest.json)
-  → .github/workflows/pages.yml            # 릴리스 → 캐시 재구성 → (최근 위험 공시) → site build → site check → 배포
+  → .github/workflows/pages.yml            # 릴리스 → 캐시 재구성 → (최근 위험 공시) → site build → site check → site links → 배포
 ```
 
 ### 스냅샷 올리기
@@ -254,6 +254,8 @@ uv run python -m fin_checkup.cli budget
 - `snapshot import` 로 새 캐시를 만들고 `site build --base-url $SITE_URL` 로 빌드한다.
 - **`site check site-out`** 이 면책·계산식·CSP·외부 스크립트·인증키 패턴을 산출물에서 확인한다(규칙은 `site/guard.py`).
   하나라도 걸리면 배포하지 않는다.
+- **`site links site-out --base-url $SITE_URL`** 이 내부 링크(상대경로·사이트 주소 아래 절대주소·`#앵커`)가 실제 파일로
+  이어지는지 본다(`site/links.py`). 깨진 내부 링크가 있으면 배포하지 않는다. 외부 링크는 목록만 남긴다.
 - 배포는 한 번에 하나(`concurrency: pages`, 진행 중인 배포를 끊지 않는다).
 
 ### secret `DART_API_KEY`
@@ -274,6 +276,7 @@ uv run python -m fin_checkup.cli budget
 ```bash
 uv run python -m fin_checkup.cli site build --out site-out --limit 50   # 앞 50곳만 (확인용), 사업연도는 --year
 uv run python -m fin_checkup.cli site check site-out                     # 배포 전과 같은 가드
+uv run python -m fin_checkup.cli site links site-out                     # 깨진 내부 링크
 uv run python -m http.server -d site-out 8080                            # http://localhost:8080/
 ```
 

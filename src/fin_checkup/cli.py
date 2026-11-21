@@ -7,6 +7,7 @@
     python -m fin_checkup.cli poll --dry-run  # 위험 공시 확인
     python -m fin_checkup.cli site build      # 정적 사이트 (캐시만 읽음)
     python -m fin_checkup.cli site check site-out  # 빌드 산출물 가드 (면책·CSP·인증키 …)
+    python -m fin_checkup.cli site links site-out  # 깨진 내부 링크 (외부 링크는 보고만)
 """
 
 from __future__ import annotations
@@ -560,6 +561,26 @@ async def cmd_site_check(args: argparse.Namespace) -> int:
     return 1
 
 
+async def cmd_site_links(args: argparse.Namespace) -> int:
+    """빌드된 사이트의 내부 링크가 실제 파일·앵커로 이어지는지. 외부 링크는 목록만."""
+    from fin_checkup.site.links import check_links, format_report
+
+    out = Path(args.out_dir)
+    if not out.is_dir():
+        print(f"{out}/ 가 없다 — site build 의 출력 폴더를 지정하세요.")
+        return 1
+    report = check_links(out, args.base_url)
+    for line in format_report(report):
+        print(line)
+    summary = f"{out}/ — HTML {report.pages:,}개 · 내부 링크 {report.internal:,}개"
+    summary += f" · 외부 {len(report.external):,}종"
+    if report.ok:
+        print(f"\n{summary} — 깨진 내부 링크 없음")
+        return 0
+    print(f"\n{summary} — 깨진 내부 링크 {len(report.broken):,}건")
+    return 1
+
+
 async def cmd_site_cards(args: argparse.Namespace) -> int:
     """회사 한 곳의 카드뉴스 PNG 를 만든다. 캐시만 읽고, 어디에도 올리지 않는다 (docs/card-news.md)."""
     import time
@@ -742,6 +763,15 @@ def main(argv: list[str] | None = None) -> int:
     )
     p_site_check.add_argument("out_dir", help="site build 의 출력 폴더")
     p_site_check.set_defaults(func=cmd_site_check)
+    p_site_links = site_sub.add_parser(
+        "links", help="빌드된 사이트의 깨진 내부 링크 검사 (있으면 종료 코드 1, 외부 링크는 보고만)"
+    )
+    p_site_links.add_argument("out_dir", help="site build 의 출력 폴더")
+    p_site_links.add_argument(
+        "--base-url", default="/",
+        help="site build 에 준 것과 같은 주소. 그 아래 절대주소(canonical 등)도 내부 링크로 검사한다",
+    )
+    p_site_links.set_defaults(func=cmd_site_links)
 
     args = parser.parse_args(argv)
     try:
