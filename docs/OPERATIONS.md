@@ -172,3 +172,20 @@ uv run python -m fin_checkup.cli budget
 | 봇이 답을 안 한다 | 로그에 `getUpdates 실패 (연속 N회)`가 쌓이면 토큰 오류(401)거나 봇을 두 곳에서 띄운 것(409). 실패가 이어지면 최대 60초까지 쉬며 재시도한다 |
 | DART `[020]` | 일별 허용량 초과. 재시도하지 않고 즉시 멈춘다(`RateLimitExceeded`). 내일까지 캐시로 버틴다 |
 | 건전한 기업이 🔴 | 업종 판정을 의심할 것. 4절 참고 |
+
+## 7. 검색 엔진에 사이트 알리기 (sitemap)
+
+`site build --base-url <사이트 주소>` 가 `sitemap.xml`(색인할 HTML 전부, lastmod = 빌드 날짜 KST)과
+`robots.txt` 를 만든다. `--base-url` 이 절대주소가 아니면 robots.txt 에 `Sitemap:` 줄이 빠지고 canonical 도 없다.
+
+**robots.txt 는 도메인 루트에서만 읽힌다.** Pages 프로젝트 사이트(`https://younghwan91.github.io/fin-checkup/`)의
+`/fin-checkup/robots.txt` 는 크롤러가 보지 않으니, sitemap 주소를 아래 두 곳에 직접 제출한다.
+
+| 어디 | 순서 |
+|---|---|
+| Google Search Console | 속성 추가 → **URL 접두어** `https://younghwan91.github.io/fin-checkup/` → 소유 확인(HTML 파일) → Sitemaps 에 `sitemap.xml` 제출 |
+| 네이버 서치어드바이저 (searchadvisor.naver.com) | 웹마스터 도구 → 사이트 등록(같은 주소) → 소유 확인(HTML 파일) → 요청 → 사이트맵 제출에 `…/fin-checkup/sitemap.xml` |
+
+소유 확인 HTML 파일(`google….html`, `naver….html`)은 비밀이 아니다(내용이 파일 이름 그대로 공개된다). 빌드가
+출력 폴더를 매번 비우므로, `pages.yml` 의 사이트 빌드 단계 끝에서 `site-out/` 루트에 그 파일을 쓰는 한 줄을 더한다.
+하위 경로 등록이 거부되면 사용자 지정 도메인을 붙여야 한다 — 그때 `SITE_URL` 도 함께 바꾼다.

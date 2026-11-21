@@ -21,8 +21,9 @@ from fin_checkup.clock import kst_today
 from fin_checkup.config import Settings
 from fin_checkup.service import CheckupService
 from fin_checkup.site.context import OG_IMAGE_PAGE, CompanyEntry, Site, safe_output_path
-from fin_checkup.site.registry import load_pages
+from fin_checkup.site.registry import Output, load_pages
 from fin_checkup.site.render import make_env
+from fin_checkup.site.sitemap import crawl_outputs, is_indexable
 from fin_checkup.storage import Cache
 
 MARKER = ".fin-checkup-site"
@@ -97,6 +98,15 @@ def _prepare_out(out: Path) -> None:
     (out / MARKER).write_text("fin-checkup site build output — 빌드마다 통째로 지워진다.\n")
 
 
+def _write(out: Path, output: Output) -> None:
+    target = out / safe_output_path(output.path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if isinstance(output.content, bytes):
+        target.write_bytes(output.content)
+    else:
+        target.write_text(output.content, encoding="utf-8")
+
+
 async def build_site(
     cache: Cache,
     out: Path,
@@ -121,15 +131,17 @@ async def build_site(
     )
     _prepare_out(out)
     files = 0
+    indexable: list[str] = []
     for _name, builder in sorted(pages.items()):
         for output in builder(site):
-            target = out / safe_output_path(output.path)
-            target.parent.mkdir(parents=True, exist_ok=True)
-            if isinstance(output.content, bytes):
-                target.write_bytes(output.content)
-            else:
-                target.write_text(output.content, encoding="utf-8")
+            _write(out, output)
+            if is_indexable(output):
+                indexable.append(output.path)
             files += 1
+    # sitemap 은 다른 페이지가 전부 나온 뒤에야 만들 수 있다 — 레지스트리 밖, 마지막에.
+    for output in crawl_outputs(site, indexable):
+        _write(out, output)
+        files += 1
 
     return BuildReport(
         companies=len(entries),
