@@ -482,6 +482,7 @@ async def cmd_site_build(args: argparse.Namespace) -> int:
     """캐시만 읽어 정적 사이트를 만든다. DART 를 부르지 않는다."""
     from fin_checkup.site.build import build_site
     from fin_checkup.site.context import OG_IMAGE_PAGE
+    from fin_checkup.site.disclosures import DisclosureFormatError, load_disclosures
 
     db_path = Path(settings.fin_checkup_db_path)
     if not db_path.exists():
@@ -492,14 +493,19 @@ async def cmd_site_build(args: argparse.Namespace) -> int:
         if done % 200 == 0 or done == total:
             print(f"  건강검진 {done:,}/{total:,}", flush=True)
 
-    disclosures = None
+    feed = None
     if args.disclosures:
-        from fin_checkup.disclosures import read_json
-
+        # 못 읽으면 공시 없이 만든다(공시 섹션·피드 항목이 빠질 뿐). Actions 에선 경고로 남긴다.
         try:
-            disclosures = read_json(args.disclosures)
-        except (OSError, ValueError) as exc:
-            print(f"공시 JSON 을 읽지 못했습니다 — 공시 없이 만듭니다: {exc}")
+            feed = load_disclosures(args.disclosures)
+        except DisclosureFormatError as exc:
+            prefix = "::warning::" if os.environ.get("GITHUB_ACTIONS") else ""
+            print(f"{prefix}공시 JSON 을 읽지 못했습니다 — 공시 없이 만듭니다: {exc}")
+        else:
+            print(
+                f"최근 위험 공시 {feed.begin}~{feed.end} {len(feed.items):,}건"
+                + (f" (형식 밖 {feed.dropped}건 뺌)" if feed.dropped else "")
+            )
 
     out = Path(args.out)
     with Cache(db_path, read_only=True) as cache:
@@ -513,7 +519,7 @@ async def cmd_site_build(args: argparse.Namespace) -> int:
                 progress=progress,
                 images=args.images,
                 image_workers=args.image_workers,
-                disclosures=disclosures,
+                disclosures=feed,
             )
         except FileExistsError as exc:
             print(str(exc))
@@ -715,7 +721,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     p_site_build.add_argument(
         "--disclosures", default=None,
-        help="`disclosures fetch` 가 쓴 JSON — 회사별·시장 전체 Atom 피드에 위험 공시를 싣는다 (없으면 생략)",
+        help="`disclosures fetch` 가 쓴 JSON — 회사 페이지·첫 화면 최근 위험 공시와 Atom 피드에 싣는다",
     )
     p_site_build.set_defaults(func=cmd_site_build)
 

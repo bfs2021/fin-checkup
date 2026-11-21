@@ -42,3 +42,11 @@
 
 판정 규칙·경계값의 근거는 `src/fin_checkup/metrics/engine.py`, 생성 코드는 `src/fin_checkup/site/pages/api.py`.
 쓰는 예: [`examples/`](../examples/README.md) — 두 회사를 나란히 출력하는 스크립트와 단계별 설명.
+
+## `data/disclosures.json` (빌드에 공시 파일을 넘겼을 때만)
+
+`cli disclosures fetch` 가 모은 최근 상장사 위험 공시(제목 기준 분류) — 형식은 `src/fin_checkup/disclosures.py`
+(`format_version` · `bgn_de`·`end_de` · `truncated_types` · `items[]`: `stock_code` · `corp_name` · `report_nm` ·
+`rcept_dt` · `rcept_no` · `category`·`category_label` · `severity` · `is_correction` · `url`). 빌드가 검증을 통과한 항목만
+싣고 `url` 은 접수번호로 다시 만든 DART 원문 주소다. 사실 목록이며 해석은 없다 — 회사 페이지와 첫 화면이 같은 파일로
+'최근 위험 공시' 를 그린다 (`src/fin_checkup/site/disclosures.py`).

@@ -1,0 +1,23 @@
+{#
+  공시 목록 한 묶음. 값: d(pages/disclosures.DisclosureSection), show_company(회사 이름을 보일지), company_paths(링크할 회사 경로 집합).
+#}
+<ul class="fc-disclosures">
+  {% for item in d.items %}
+  <li>
+    <time datetime="{{ item.rcept_dt.isoformat() }}">{{ item.rcept_dt.isoformat() }}</time>
+    {% if show_company | default(false) %}
+    {% if item.company_path in company_paths %}<a class="fc-disclosure-corp" href="{{ url(item.company_path) }}">{{ item.corp_name }}</a>{% else %}<span class="fc-disclosure-corp">{{ item.corp_name }}</span>{% endif %}
+    {% endif %}
+    <a class="fc-disclosure-kind" href="{{ url(item.explainer_path) }}">{{ item.label }}</a>
+    <span class="fc-disclosure-title">{{ item.report_nm }}</span>
+    <a class="fc-disclosure-src" href="{{ item.url }}" rel="noopener noreferrer">DART 원문</a>
+  </li>
+  {% endfor %}
+</ul>
+{% if d.more %}
+<p class="fc-note">이 기간에 {{ d.more }}건이 더 있습니다. DART 에서 회사 이름으로 검색하면 전체 목록을 볼 수 있습니다.</p>
+{% endif %}
+{% if d.truncated %}
+<p class="fc-note">일부 공시유형은 조회 상한에 걸려 이 목록에서 빠진 공시가 있을 수 있습니다.</p>
+{% endif %}
+<p class="fc-note"><a href="{{ url(d.feed_path) }}">Atom 피드</a>로도 받아 볼 수 있습니다 (RSS 리더).</p>

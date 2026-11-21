@@ -131,17 +131,16 @@ jobs:
         if: steps.snapshot.outputs.found == 'true'
         env:
           YEAR: ${{ inputs.year }}
+          DISCLOSURES_OK: ${{ steps.disclosures.outcome == 'success' }}
         run: |
           args=(--out site-out --base-url "$SITE_URL")
           if [ -n "$YEAR" ]; then args+=(--year "$YEAR"); fi
-          # 공시가 있으면 회사별·시장 전체 Atom 피드에 싣는다 (feeds/).
-          if [ -f _site-data/disclosures.json ]; then args+=(--disclosures _site-data/disclosures.json); fi
-          uv run python -m fin_checkup.cli site build "${args[@]}"
-          # 사이트 빌더가 공시를 읽게 되기 전까지(D3) 원자료를 정적 JSON 으로 함께 싣는다.
-          if [ -f _site-data/disclosures.json ]; then
-            mkdir -p site-out/data
-            cp _site-data/disclosures.json site-out/data/disclosures.json
+          # 공시 단계가 성공해 파일을 남겼을 때만 넘긴다. 빌더가 회사 페이지·첫 화면 공시 섹션,
+          # 회사별·시장 전체 Atom 피드(feeds/)의 공시 항목, /data/disclosures.json 을 만든다.
+          if [ "$DISCLOSURES_OK" = "true" ] && [ -f _site-data/disclosures.json ]; then
+            args+=(--disclosures _site-data/disclosures.json)
           fi
+          uv run python -m fin_checkup.cli site build "${args[@]}"
 
       # 넘지 않는 선을 산출물에서 직접 확인한다(면책·계산식·CSP·외부 스크립트·인증키 — site/guard.py).
       # 하나라도 걸리면 배포하지 않는다.

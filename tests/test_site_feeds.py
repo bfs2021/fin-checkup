@@ -14,6 +14,7 @@ from datetime import date
 import pytest
 from hub_seed import seed_site_cache
 
+from fin_checkup.alerts.classify import RiskKind
 from fin_checkup.cli import main
 from fin_checkup.config import settings
 from fin_checkup.disclaimer import DISCLAIMER
@@ -27,7 +28,18 @@ BASE = "https://example.github.io/fin-checkup/"
 RFC3339 = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:Z|[+-]\d{2}:\d{2})$")
 
 
+#: 강도 → 그 강도의 실제 유형. 사이트는 category 를 RiskKind 로 검증하고 유형으로 시장 전체 여부를 정한다.
+KIND_BY_SEVERITY = {
+    "critical": RiskKind.LISTING_STATUS,
+    "high": RiskKind.AUDIT_OPINION,
+    "medium": RiskKind.INSIDER_TRADING,
+}
+CRITICAL = RiskKind.LISTING_STATUS.label
+MEDIUM = RiskKind.INSIDER_TRADING.label
+
+
 def item(no: str, day: str, code: str = "005930", severity: str = "critical", **extra):
+    kind = KIND_BY_SEVERITY[severity]
     return {
         "corp_code": "00126380",
         "stock_code": code,
@@ -35,8 +47,8 @@ def item(no: str, day: str, code: str = "005930", severity: str = "critical", **
         "report_nm": f"공시 제목 {no}",
         "rcept_dt": day,
         "rcept_no": no,
-        "category": "x",
-        "category_label": "감사의견 비적정",
+        "category": kind.value,
+        "category_label": kind.label,
         "severity": severity,
         "is_correction": False,
         "url": f"https://dart.fss.or.kr/dsaf001/main.do?rcpNo={no}",
@@ -162,16 +174,17 @@ async def test_company_feed_carries_its_own_risk_disclosures(out):
     got = entries(parse(out / "feeds" / "c" / "005930.xml"))
     dart = {t: e for t, e in got.items() if t.startswith("[")}
     assert set(dart) == {
-        "[감사의견 비적정] 공시 제목 20261120000001",
-        "[감사의견 비적정] 제목제어문자",
-        "[감사의견 비적정] 공시 제목 20261116000005",
+        f"[{CRITICAL}] 공시 제목 20261120000001",
+        f"[{MEDIUM}] 제목제어문자",
+        f"[{CRITICAL}] 공시 제목 20261116000005",
     }
-    first = dart["[감사의견 비적정] 공시 제목 20261120000001"]
+    first = dart[f"[{CRITICAL}] 공시 제목 20261120000001"]
     assert first.find("a:id", A).text == feed_id("dart/20261120000001")
     assert first.find("a:updated", A).text == "2026-11-20T00:00:00+09:00"
     assert first.find("a:link", A).get("href").startswith("https://dart.fss.or.kr/")
-    assert dart["[감사의견 비적정] 공시 제목 20261116000005"].find("a:link", A) is None, (
-        "DART 아닌 주소는 링크 안 함"
+    # 파일의 url 은 믿지 않는다 — 원문 링크는 접수번호로 다시 만든다 (site/disclosures.py).
+    assert dart[f"[{CRITICAL}] 공시 제목 20261116000005"].find("a:link", A).get("href") == (
+        "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20261116000005"
     )
 
 
@@ -179,9 +192,9 @@ async def test_market_feed_has_critical_disclosures_only(out):
     root = parse(out / "feeds" / "disclosures.xml")
     titles = list(entries(root))
     assert titles == [
-        "[감사의견 비적정] 삼성전자 — 공시 제목 20261120000001",
-        "[감사의견 비적정] 다른회사 — 공시 제목 20261118000003",
-        "[감사의견 비적정] 삼성전자 — 공시 제목 20261116000005",
+        f"[{CRITICAL}] 삼성전자 — 공시 제목 20261120000001",
+        f"[{CRITICAL}] 다른회사 — 공시 제목 20261118000003",
+        f"[{CRITICAL}] 삼성전자 — 공시 제목 20261116000005",
     ]
     assert "20261115~20261121" in root.find("a:subtitle", A).text
 

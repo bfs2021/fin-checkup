@@ -12,7 +12,13 @@ import logging
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 
-from fin_checkup.alerts.classify import RiskDisclosure, Severity, classify_all
+from fin_checkup.alerts.classify import (
+    MARKET_WIDE_MIN_SEVERITY,
+    RiskDisclosure,
+    Severity,
+    classify_all,
+    same_event_key,
+)
 from fin_checkup.alerts.message import format_alert, format_channel_alert
 from fin_checkup.alerts.telegram import Notifier
 from fin_checkup.clock import kst_today
@@ -54,7 +60,7 @@ def _collapse_same_event(
     absorbed: dict[str, list[str]] = {}
     for risk in sorted(risks, key=lambda r: r.disclosure.rcept_no):
         d = risk.disclosure
-        key = (d.corp_code, d.rcept_dt, risk.kind.value)
+        key = same_event_key(d.corp_code, d.rcept_dt, risk.kind)
         leader = kept.setdefault(key, risk)
         if leader is not risk:
             absorbed.setdefault(leader.disclosure.rcept_no, []).append(d.rcept_no)
@@ -145,7 +151,7 @@ class AlertWorker:
         channel_id: str,
         days: int = 1,
         today: date | None = None,
-        min_severity: Severity = Severity.CRITICAL,
+        min_severity: Severity = MARKET_WIDE_MIN_SEVERITY,
         max_per_run: int = 30,
         bot_username: str = "",
     ) -> PollReport:
