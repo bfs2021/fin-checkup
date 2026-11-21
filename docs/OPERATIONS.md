@@ -64,6 +64,14 @@ uv run python scripts/collect_universe.py --year 2024 --limit 1000
 uv run python scripts/collect_universe.py --year 2024 --limit 1000 --skip 1000
 ```
 
+사이트의 "최근 위험 공시" 재료는 따로 받는다. 공시유형 5개 × 페이지 수만큼 호출하고(7일치 수십 건 — 지분공시가 가장 많다),
+시작 전에 최대치(5 × `--max-pages`)가 오늘 남은 허용량 안인지 보고 넘으면 시작하지 않는다.
+`020` 을 받으면 지난 파일을 그대로 두고 멈춘다 — 빈 목록으로 덮으면 "위험 공시 없음" 으로 읽힌다.
+
+```bash
+uv run python -m fin_checkup.cli disclosures fetch --days 7 --out site-data/disclosures.json
+```
+
 ## 3. 알림 워커가 공시를 놓치지 않는 방법
 
 스케줄러는 "최근 N일"이 아니라 **"마지막으로 성공한 시점부터"**를 조회한다.
