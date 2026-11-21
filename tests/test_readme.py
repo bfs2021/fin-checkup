@@ -55,3 +55,10 @@ def test_badges_in_readme_link_back_to_the_company_page(readme):
     for line in readme.read_text(encoding="utf-8").splitlines():
         for code in re.findall(r"badge/(\w{6})\.svg", line):
             assert f"]({SITE_URL}c/{code}/)" in line or f'href="{SITE_URL}c/{code}/"' in line, line
+
+
+def test_readmes_link_to_each_other_at_the_top():
+    ko = (ROOT / "README.md").read_text(encoding="utf-8").splitlines()[:5]
+    en = (ROOT / "README.en.md").read_text(encoding="utf-8").splitlines()[:5]
+    assert any("(README.en.md)" in line for line in ko)
+    assert any("(README.md)" in line for line in en)
