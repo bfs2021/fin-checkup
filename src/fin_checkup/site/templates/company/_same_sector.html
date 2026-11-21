@@ -1,0 +1,16 @@
+{#
+  같은 업종 회사 — 이름순으로 이웃한 회사들. 지표 값으로 고르지 않는다 (pages/same_sector.py).
+  값: same_sector(SameSector 또는 None).
+#}
+{% if same_sector %}
+<section class="fc-section" id="same-sector" aria-labelledby="same-sector-title">
+  <h2 id="same-sector-title">같은 업종 회사</h2>
+  <p class="fc-hint">{{ same_sector.group.info.name }} 업종 {{ same_sector.others }}곳 가운데 이름순으로 이 회사 앞뒤에 있는 {{ same_sector.peers | length }}곳입니다. 지표 값으로 고르지 않았습니다.</p>
+  <ul class="fc-members">
+    {% for e in same_sector.peers %}
+    <li><a href="{{ url(e.path) }}">{{ e.name }}</a> <span class="fc-code">{{ e.stock_code }}</span></li>
+    {% endfor %}
+  </ul>
+  <p><a href="{{ url(same_sector.group.path) }}#members">{{ same_sector.group.info.name }} 전체 {{ same_sector.group.count }}곳 보기</a></p>
+</section>
+{% endif %}
