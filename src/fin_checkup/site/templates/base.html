@@ -1,16 +1,39 @@
+{#
+  공통 레이아웃. 블록: title · head · header_search · main · scripts.
+  링크·자원은 전부 url() 상대경로 — 외부 글꼴·CDN·추적기를 넣지 않는다 (CSP 가 막는다).
+#}
 <!doctype html>
-<html lang="ko">
+<html lang="ko" data-root="{{ root }}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'self'">
+<meta name="referrer" content="no-referrer">
+<meta name="color-scheme" content="light dark">
 <title>{% block title %}fin-checkup{% endblock %}</title>
+<link rel="stylesheet" href="{{ url('assets/site.css') }}">
+{% block head %}{% endblock %}
 </head>
 <body>
-<main id="main">
+<a class="fc-skip" href="#main">본문으로 건너뛰기</a>
+<header class="fc-header">
+  <div class="fc-wrap fc-header-row">
+    <a class="fc-brand" href="{{ url('') }}">fin-checkup</a>
+    {% block header_search %}
+    {% include "_search_box.html" %}
+    {% endblock %}
+  </div>
+</header>
+<main id="main" class="fc-wrap">
 {% block main %}{% endblock %}
 </main>
-<footer>
-<p class="fc-disclaimer">{{ DISCLAIMER }}</p>
+<footer class="fc-footer">
+  <div class="fc-wrap">
+    <p class="fc-disclaimer">{{ DISCLAIMER }}</p>
+    <p>데이터 출처: 금융감독원 전자공시시스템(DART) · 미국 SEC EDGAR. 계산식과 경계값은 각 지표 옆에 그대로 적었습니다.</p>
+    <p>데이터 기준: {{ site.year }} 사업연도 · 빌드 {{ site.built_on.isoformat() }} · <a href="https://github.com/younghwan91/fin-checkup">소스 코드(MIT)</a></p>
+  </div>
 </footer>
+{% block scripts %}{% endblock %}
 </body>
 </html>

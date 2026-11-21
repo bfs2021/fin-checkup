@@ -1,0 +1,5 @@
+<form class="fc-search" role="search" action="{{ url('') }}" method="get">
+  <label class="fc-visually-hidden" for="fc-q-{{ search_id | default('top') }}">회사 검색</label>
+  <input id="fc-q-{{ search_id | default('top') }}" class="fc-search-input" type="search" name="q"
+         placeholder="회사 이름 · 종목코드 · 초성(ㅅㅅㅈㅈ)" autocomplete="off" spellcheck="false">
+</form>
