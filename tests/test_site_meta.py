@@ -12,20 +12,24 @@ from datetime import date
 
 import pytest
 from hub_seed import seed_site_cache
+from PIL import Image
 
-from fin_checkup.site import registry
+from fin_checkup.site import build
 from fin_checkup.site.build import build_site
 from fin_checkup.site.context import OG_IMAGE_PAGE, page_url
+from fin_checkup.site.images.fonts import resolve_fonts
 from fin_checkup.storage import Cache
 
 BASE = "https://example.github.io/fin-checkup/"
 
 
-async def _build(tmp_path, base_url: str = BASE, name: str = "out"):
+async def _build(tmp_path, base_url: str = BASE, name: str = "out", images: bool = False):
     with Cache(tmp_path / f"{name}.duckdb") as cache:
         seed_site_cache(cache)
         target = tmp_path / name
-        await build_site(cache, target, 2024, base_url=base_url, built_on=date(2026, 11, 21))
+        await build_site(
+            cache, target, 2024, base_url=base_url, built_on=date(2026, 11, 21), images=images
+        )
     return target
 
 
@@ -105,20 +109,33 @@ async def test_common_tags_lang_theme_color_site_name_and_card(out):
         assert meta(text, "name", "twitter:card") == "summary", "이미지가 없으면 큰 카드를 쓰지 않는다"
 
 
-async def test_og_image_only_when_the_image_page_is_registered(tmp_path, monkeypatch):
-    out = await _build(tmp_path, name="noimg")
+async def test_no_og_image_without_pngs(tmp_path):
+    out = await _build(tmp_path, name="noimg", images=False)
     assert 'property="og:image"' not in read(out, "c/005930/index.html")
+    assert not (out / "og").exists()
 
-    def og_images(site):
-        return []
 
-    monkeypatch.setitem(registry.PAGES, OG_IMAGE_PAGE, og_images)
-    out = await _build(tmp_path, name="img")
+@pytest.mark.skipif(resolve_fonts() is None, reason="한국어 글꼴 없음 (CI 는 fonts-noto-cjk 를 깐다)")
+async def test_og_image_points_at_a_png_that_was_built(tmp_path):
+    out = await _build(tmp_path, name="img", images=True)
     text = read(out, "c/005930/index.html")
     assert meta(text, "property", "og:image") == f"{BASE}og/005930.png"
     assert meta(text, "name", "twitter:card") == "summary_large_image"
+    with Image.open(out / "og/005930.png") as png:
+        assert png.size == (1200, 630)
     # 회사가 아닌 페이지는 회사 카드를 쓰지 않는다.
     assert 'property="og:image"' not in read(out, "index.html")
+
+
+async def test_without_a_korean_font_the_build_skips_pngs_and_says_why(tmp_path, monkeypatch):
+    monkeypatch.setattr(build, "resolve_fonts", lambda: None)
+    with Cache(tmp_path / "nofont.duckdb") as cache:
+        seed_site_cache(cache)
+        report = await build_site(cache, tmp_path / "nofont", 2024, base_url=BASE, images=True)
+    assert "fonts-noto-cjk" in report.image_warning
+    assert OG_IMAGE_PAGE not in report.pages
+    assert not (tmp_path / "nofont" / "og").exists()
+    assert 'property="og:image"' not in read(tmp_path / "nofont", "c/005930/index.html")
 
 
 async def test_company_name_in_meta_is_escaped(tmp_path):

@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import logging
+import os
 import sys
 from datetime import timedelta
 from pathlib import Path
@@ -480,6 +481,7 @@ async def cmd_budget(args: argparse.Namespace) -> int:
 async def cmd_site_build(args: argparse.Namespace) -> int:
     """캐시만 읽어 정적 사이트를 만든다. DART 를 부르지 않는다."""
     from fin_checkup.site.build import build_site
+    from fin_checkup.site.context import OG_IMAGE_PAGE
 
     db_path = Path(settings.fin_checkup_db_path)
     if not db_path.exists():
@@ -494,7 +496,14 @@ async def cmd_site_build(args: argparse.Namespace) -> int:
     with Cache(db_path, read_only=True) as cache:
         try:
             report = await build_site(
-                cache, out, args.year, limit=args.limit, base_url=args.base_url, progress=progress
+                cache,
+                out,
+                args.year,
+                limit=args.limit,
+                base_url=args.base_url,
+                progress=progress,
+                images=args.images,
+                image_workers=args.image_workers,
             )
         except FileExistsError as exc:
             print(str(exc))
@@ -505,6 +514,17 @@ async def cmd_site_build(args: argparse.Namespace) -> int:
         f"  계산 {report.load_seconds:.1f}초 · 렌더 {report.render_seconds:.1f}초 · "
         f"회사당 {report.per_company_ms:.0f}ms"
     )
+    if OG_IMAGE_PAGE in report.pages:
+        n, seconds = report.pages[OG_IMAGE_PAGE]
+        per = seconds / n * 1000 if n else 0.0
+        print(
+            f"  공유 카드 PNG {n:,}장 · {seconds:.1f}초 · 장당 {per:.0f}ms "
+            f"(프로세스 {args.image_workers}개)"
+        )
+    if report.image_warning:
+        # GitHub Actions 에선 워크플로 요약에 경고 주석으로 뜬다.
+        prefix = "::warning::" if os.environ.get("GITHUB_ACTIONS") else "경고: "
+        print(f"{prefix}{report.image_warning}")
     return 0
 
 
@@ -630,6 +650,18 @@ def main(argv: list[str] | None = None) -> int:
     p_site_build.add_argument(
         "--base-url", default="/",
         help="절대주소가 필요한 곳(canonical·sitemap)에 쓸 사이트 주소. 링크는 상대경로라 무관",
+    )
+    p_site_build.add_argument(
+        "--images",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="공유 카드 PNG(og/<코드>.png) 생성. 한국어 글꼴이 없으면 경고하고 건너뛴다",
+    )
+    p_site_build.add_argument(
+        "--image-workers",
+        type=int,
+        default=os.cpu_count() or 1,
+        help="PNG 를 나눠 그릴 프로세스 수 (기본: CPU 수)",
     )
     p_site_build.set_defaults(func=cmd_site_build)
     p_site_check = site_sub.add_parser(

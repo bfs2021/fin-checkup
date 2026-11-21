@@ -106,6 +106,20 @@ jobs:
           uv run python -m fin_checkup.cli disclosures fetch --days 7 --max-pages 30 \
             --out _site-data/disclosures.json
 
+      # 공유 카드 PNG(og/<코드>.png)의 한국어 글꼴. 러너엔 한글 글꼴이 없다 — 없으면 빌드는 PNG 와
+      # og:image 를 빼고 경고만 남긴다(두부 □ 그림을 내지 않게). 글꼴 경로는 site/images/fonts.py 가 찾는다.
+      - name: 한국어 글꼴 (공유 카드 PNG)
+        if: steps.snapshot.outputs.found == 'true'
+        continue-on-error: true
+        run: |
+          if fc-list :lang=ko | grep -q .; then
+            echo "한국어 글꼴이 이미 있다"
+          else
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq --no-install-recommends fonts-noto-cjk
+          fi
+          fc-list :lang=ko family | sort -u | head -5
+
       - name: 사이트 빌드
         if: steps.snapshot.outputs.found == 'true'
         env:
