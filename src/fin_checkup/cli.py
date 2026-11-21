@@ -422,6 +422,44 @@ async def cmd_snapshot(args: argparse.Namespace) -> int:
     return 0
 
 
+async def cmd_disclosures(args: argparse.Namespace) -> int:
+    """시장 전체 최근 위험 공시를 JSON 으로 쓴다 (사이트 재료). 호출은 dart_call_log 에 센다."""
+    from fin_checkup.dart.client import DartClient
+    from fin_checkup.disclosures import fetch_recent_risks, worst_case_calls, write_json
+
+    if not settings.has_api_key:
+        print("DART_API_KEY가 없습니다. 공시 목록은 인증키가 있어야 받을 수 있습니다.")
+        return 1
+    with Cache(settings.fin_checkup_db_path) as cache:
+        used = cache.dart_calls_today(today_key())
+        need = worst_case_calls(args.max_pages)
+        if used + need > settings.dart_daily_quota:
+            print(
+                f"오늘 DART 호출 {used:,}건 — 이번 실행이 최대 {need}건을 더 쓰면 "
+                f"일별 허용량 {settings.dart_daily_quota:,}건을 넘을 수 있어 시작하지 않습니다."
+            )
+            return 1
+
+        def record(endpoint: str) -> None:
+            cache.record_dart_call(endpoint, today_key())
+
+        try:
+            async with DartClient(settings=settings, on_call=record) as client:
+                payload = await fetch_recent_risks(client, days=args.days, max_pages=args.max_pages)
+        except RateLimitExceeded:
+            # 020 은 오늘 안에 풀리지 않는다. 지난 파일은 그대로 둔다 — 빈 목록으로 덮으면
+            # '최근 위험 공시 없음' 으로 읽힌다.
+            print("DART 일별 호출 허용량을 넘었습니다. 파일을 바꾸지 않고 멈춥니다.")
+            return 1
+    write_json(payload, args.out)
+    print(
+        f"{payload['bgn_de']}~{payload['end_de']} 상장사 위험 공시 {payload['count']}건 → {args.out}"
+    )
+    if payload["truncated_types"]:
+        print(f"⚠️ 페이지 상한에 걸린 공시유형: {', '.join(payload['truncated_types'])} (일부 누락 가능)")
+    return 0
+
+
 async def cmd_budget(args: argparse.Namespace) -> int:
     """오늘 DART를 몇 번 호출했는지."""
     with Cache(settings.fin_checkup_db_path) as cache:
@@ -503,6 +541,16 @@ def main(argv: list[str] | None = None) -> int:
     p_import.add_argument("src", help="manifest.json 이 있는 폴더")
     p_import.add_argument("--db", required=True, help="만들 캐시 파일 (이미 있으면 거부)")
     p_import.set_defaults(func=cmd_snapshot)
+
+    p_disc = sub.add_parser("disclosures", help="시장 전체 최근 위험 공시 수집 (사이트용 JSON)")
+    disc_sub = p_disc.add_subparsers(dest="disclosures_action", required=True)
+    p_fetch = disc_sub.add_parser("fetch", help="최근 N일(KST) 상장사 위험 공시 → JSON")
+    p_fetch.add_argument("--days", type=int, default=7, help="오늘 포함 최근 며칠 (1~90)")
+    p_fetch.add_argument("--out", required=True, help="쓸 JSON 파일")
+    p_fetch.add_argument(
+        "--max-pages", type=int, default=50, help="공시유형당 최대 페이지(100건/페이지)"
+    )
+    p_fetch.set_defaults(func=cmd_disclosures)
 
     p_account = sub.add_parser("account", help="운영자용 계정 관리")
     account_sub = p_account.add_subparsers(dest="account_action", required=True)

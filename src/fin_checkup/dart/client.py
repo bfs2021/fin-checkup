@@ -122,6 +122,8 @@ class DartClient:
         self.retry_policy = retry_policy or RetryPolicy()
         #: 이 클라이언트가 실제로 보낸 요청 수. 재시도도 한 건으로 센다.
         self.calls_made = 0
+        #: 마지막 search_disclosures 가 max_pages 상한에서 멈췄는지 (뒤 페이지가 남았다).
+        self.last_search_truncated = False
         self._on_call = on_call
 
     async def __aenter__(self) -> DartClient:
@@ -277,6 +279,7 @@ class DartClient:
             params["corp_cls"] = corp_cls
 
         results: list[Disclosure] = []
+        self.last_search_truncated = False
         page = 1
         while page <= max_pages:
             data = await self._get_json(
@@ -305,6 +308,7 @@ class DartClient:
                 break
             page += 1
         else:
+            self.last_search_truncated = True
             logger.warning(
                 "[dart] 공시검색이 %d페이지 상한에 걸렸다 — 기간을 좁혀 다시 조회할 것", max_pages
             )
