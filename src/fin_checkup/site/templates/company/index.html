@@ -8,6 +8,7 @@
 {% block main %}
 <article class="fc-company">
 {% include "company/_summary.html" %}
+{% include "company/_actions.html" %}
 {% include "company/_metrics.html" %}
 {% include "company/_trend.html" %}
 {% include "company/_red_flags.html" %}
@@ -15,4 +16,7 @@
 {% include "_season.html" %}
 {% include "company/_footnote.html" %}
 </article>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url('assets/share.js') }}" defer></script>
 {% endblock %}
