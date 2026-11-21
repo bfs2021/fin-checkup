@@ -406,3 +406,109 @@ def test_currency_is_the_majority_when_lines_disagree():
         for i in range(3)
     ] + [AccountLine(sj_div="BS", account_id="k", account_nm="k", thstrm_amount=1.0, currency="KRW")]
     assert normalize_statements(raw(*lines)).currency == "USD"
+
+
+# ── 매출액: 금융지주의 보험 부문 줄 · 0 으로 적힌 머리 줄 ─────────────────
+
+
+def test_insurance_revenue_of_a_bank_groups_subsidiary_is_not_revenue():
+    """은행·금융지주의 '보험수익' 은 보험 자회사 한 부문이다. 매출로 쓰면 영업이익률이 수천 %가 된다.
+
+    중소기업은행 2024: 보험수익 0.09조 · 이자수익 18.95조 · 영업이익 3.59조 → 영업이익률 3,845% 🟢.
+    """
+    fin = normalize_statements(raw(
+        line("CIS", "ifrs-full_InsuranceRevenue", "보험수익", 93_466.0),
+        line("CIS", "ifrs-full_RevenueFromInterest", "이자수익", 18_954_860.0),
+        line("CIS", "dart_OperatingIncomeLoss", "영업이익", 3_594_087.0),
+    ))
+    assert fin.revenue is None
+
+
+def test_insurers_insurance_revenue_is_still_revenue():
+    """보험사는 보험수익이 본업 매출이다 — 운용 이자수익보다 크다(삼성화재 2024: 17.28조 vs 2.25조)."""
+    fin = normalize_statements(raw(
+        line("IS", "ifrs-full_InsuranceRevenue", "보험수익", 17_276.0),
+        line("IS", "-표준계정코드 미사용-", "이자수익", 2_251.0),
+    ))
+    assert fin.revenue == 17_276.0
+
+
+def test_zero_header_line_does_not_hide_the_real_revenue_line():
+    """한화생명 2023: '영업수익' 머리 줄이 0 으로 와서 보험수익 9.79조를 가렸다 — 매출 0 → 증가율 ⚫."""
+    fin = normalize_statements(raw(
+        line("IS", "-표준계정코드 미사용-", "영업수익", 0.0),
+        line("IS", "ifrs-full_InsuranceRevenue", "보험수익", 9_790.0),
+    ))
+    assert fin.revenue == 9_790.0
+
+
+def test_revenue_reported_as_zero_stays_zero():
+    """매출이 정말 0 인 회사(기업인수목적회사 등)는 0 이다 — 다른 후보가 없으면 없다고 하지 않는다."""
+    fin = normalize_statements(raw(line("IS", "ifrs-full_Revenue", "매출액", 0.0)))
+    assert fin.revenue == 0.0
+
+
+# ── 이름 대체 매칭: 로마 숫자 머리 · 각주 꼬리 · 지배/비지배 합 · '창출된 현금' ───────
+
+
+def test_roman_numeral_section_prefix_and_footnote_suffix_are_ignored_by_name():
+    """표준 태그 없는 줄은 'Ⅰ.매출액' · 'VIII. 당기순이익' · '재고자산 (주7)' 처럼 온다."""
+    fin = normalize_statements(raw(
+        line("IS", "-표준계정코드 미사용-", "Ⅰ.매출액", 238.0),
+        line("IS", "-표준계정코드 미사용-", "IV.영업이익(손실)", -51.0),
+        line("IS", "-표준계정코드 미사용-", "VIII. 당기순이익", 89.0),
+        line("BS", "-표준계정코드 미사용-", "재고자산 (주7)", 42.0),
+        line("CF", "ifrs-full_CashFlowsFromUsedInOperations", "I. 영업활동으로인한현금흐름", 4015.0),
+    ))
+    assert (fin.revenue, fin.operating_income, fin.net_income, fin.inventories) == (238.0, -51.0, 89.0, 42.0)
+    assert fin.operating_cash_flow == 4015.0, "코오롱인더스트리 2023·2024 영업활동현금흐름 ⚫"
+
+
+def test_arabic_numbered_sub_item_is_not_read_as_the_total():
+    """'1. 매출액' 은 'Ⅰ. 영업수익' 아래의 내역일 수 있다 — 아라비아 숫자 머리는 떼지 않는다."""
+    fin = normalize_statements(raw(
+        line("IS", "-표준계정코드 미사용-", "Ⅰ. 영업수익", 500.0),
+        line("IS", "-표준계정코드 미사용-", "1. 매출액", 300.0),
+    ))
+    assert fin.revenue == 500.0
+
+
+def test_consolidated_net_income_names():
+    fin = normalize_statements(raw(line("IS", "-표준계정코드 미사용-", "당기연결순이익(손실)", -48.0)))
+    assert fin.net_income == -48.0
+    fin = normalize_statements(raw(line("IS", "-표준계정코드 미사용-", "연결당기순이익", 72.0)))
+    assert fin.net_income == 72.0
+
+
+def test_net_income_is_the_sum_of_owners_and_noncontrolling_when_no_total_line():
+    """일진전기 2024 는 당기순이익 합계 줄 없이 지배·비지배 귀속 두 줄만 적었다 → 순이익 ⚫."""
+    fin = normalize_statements(raw(
+        line("CIS", "ifrs-full_ProfitLossAttributableToOwnersOfParent", "지배기업 소유주지분", 461.0),
+        line("CIS", "ifrs-full_ProfitLossAttributableToNoncontrollingInterests", "비지배지분", -3.0),
+    ))
+    assert fin.net_income == 458.0
+
+
+def test_owners_share_alone_is_not_net_income():
+    """비지배 줄이 없으면 합계를 모른다 — 지배기업 몫만으로 채우지 않는다."""
+    fin = normalize_statements(raw(
+        line("CIS", "ifrs-full_ProfitLossAttributableToOwnersOfParent", "지배기업 소유주지분", 461.0),
+    ))
+    assert fin.net_income is None
+
+
+def test_cash_generated_from_operations_is_not_operating_cash_flow():
+    """인팩 2024: OCF 태그가 '영업활동에서 창출된 현금흐름'(이자·법인세 전, 183억)에 붙고, 실제
+    영업활동현금흐름 49억은 태그 없는 줄이었다."""
+    fin = normalize_statements(raw(
+        line("CF", "-표준계정코드 미사용-", "영업활동으로 인한 현금흐름", 49.0),
+        line("CF", "ifrs-full_CashFlowsFromUsedInOperatingActivities", "영업활동에서 창출된 현금흐름", 183.0),
+    ))
+    assert fin.operating_cash_flow == 49.0
+
+
+def test_cash_generated_line_is_kept_when_it_is_the_only_candidate():
+    fin = normalize_statements(raw(
+        line("CF", "ifrs-full_CashFlowsFromUsedInOperatingActivities", "영업에서 창출된 현금흐름", 145.0),
+    ))
+    assert fin.operating_cash_flow == 145.0
