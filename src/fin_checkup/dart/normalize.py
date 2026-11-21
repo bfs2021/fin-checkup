@@ -39,6 +39,24 @@ class FieldSpec:
     aliases: tuple[str, ...] = field(default=(), repr=False)
 
 
+#: 매출액. 금융업은 '영업수익', 보험은 '보험수익'으로 공시한다.
+REVENUE = FieldSpec(
+    "revenue", INCOME,
+    account_ids=(
+        "ifrs-full_Revenue",
+        "ifrs-full_RevenueFromContractsWithCustomers",
+        "ifrs_Revenue",
+    ),
+    account_names=("매출액", "수익(매출액)", "영업수익", "매출", "영업수익합계", "보험수익"),
+)
+#: 이자수익. '보험수익' 이 이보다 작으면 보험사가 아니라 은행·금융지주의 보험 자회사 한 부문이다.
+INTEREST_REVENUE_IDS = frozenset({
+    "ifrs-full_RevenueFromInterest",
+    "ifrs-full_InterestRevenueCalculatedUsingEffectiveInterestMethod",
+})
+INSURANCE_REVENUE_NAME = "보험수익"
+
+
 FIELD_SPECS: tuple[FieldSpec, ...] = (
     # ── 재무상태표 ──────────────────────────────────────────────
     FieldSpec(
@@ -78,16 +96,8 @@ FIELD_SPECS: tuple[FieldSpec, ...] = (
         account_names=("자본금", "보통주자본금"),
     ),
     # ── 손익계산서 ──────────────────────────────────────────────
-    FieldSpec(
-        "revenue", INCOME,
-        account_ids=(
-            "ifrs-full_Revenue",
-            "ifrs-full_RevenueFromContractsWithCustomers",
-            "ifrs_Revenue",
-        ),
-        # 금융업은 '영업수익', 보험은 '보험수익'으로 공시한다.
-        account_names=("매출액", "수익(매출액)", "영업수익", "매출", "영업수익합계", "보험수익"),
-    ),
+    # 매출액은 금융지주의 보험 부문 줄을 걸러야 해서 normalize 가 _revenue 로 다시 찾는다.
+    REVENUE,
     FieldSpec(
         "operating_income", INCOME,
         account_ids=(
@@ -231,13 +241,40 @@ def _find(lines: Iterable[AccountLine], spec: FieldSpec) -> float | None:
         by_id.setdefault(_key(ln.account_id), ln.thstrm_amount)  # type: ignore[arg-type]
         by_name.setdefault(_key(ln.account_nm), ln.thstrm_amount)  # type: ignore[arg-type]
 
-    for account_id in spec.account_ids:
-        if (value := by_id.get(_key(account_id))) is not None:
-            return abs(value) if spec.absolute else value
-    for account_nm in spec.account_names:
-        if (value := by_name.get(_key(account_nm))) is not None:
-            return abs(value) if spec.absolute else value
-    return None
+    found = [by_id.get(_key(account_id)) for account_id in spec.account_ids]
+    found += [by_name.get(_key(account_nm)) for account_nm in spec.account_names]
+    matches = [value for value in found if value is not None]
+    if not matches:
+        return None
+    # 0 으로 온 머리 줄('영업수익' 0 아래에 '보험수익' 9.79조 — 한화생명 2023)이 실제 줄을 가리지
+    # 않게, 0 이 아닌 후보가 있으면 그쪽이다. 후보가 전부 0 이면 0 이다(정말 0 인 회사).
+    value = next((v for v in matches if v != 0), matches[0])
+    return abs(value) if spec.absolute else value
+
+
+def _revenue(lines: Iterable[AccountLine]) -> float | None:
+    """매출액. 이자수익보다 작은 '보험수익' 줄은 은행·금융지주의 보험 부문이라 후보에서 뺀다.
+
+    중소기업은행·KB·신한·하나·iM 금융지주(2023·2024)가 보험 자회사의 보험수익을 매출로 써서
+    영업이익률이 70~3,845% 🟢 로 나갔다. 보험사는 보험수익이 이자수익보다 크다(2023·2024 보험사 11곳 모두).
+    """
+    income = [ln for ln in lines if ln.sj_div in INCOME and ln.thstrm_amount is not None]
+    interest = max(
+        (
+            abs(ln.thstrm_amount)  # type: ignore[arg-type]
+            for ln in income
+            if ln.account_id in INTEREST_REVENUE_IDS or _key(ln.account_nm) == "이자수익"
+        ),
+        default=0.0,
+    )
+    candidates = [
+        ln for ln in income
+        if not (
+            _key(ln.account_nm) == INSURANCE_REVENUE_NAME
+            and abs(ln.thstrm_amount) < interest  # type: ignore[arg-type]
+        )
+    ]
+    return _find(candidates, REVENUE)
 
 
 def _trade_receivables(
@@ -344,6 +381,7 @@ def _currency_of(lines: Iterable[AccountLine]) -> str:
 def normalize_statements(raw: RawStatements) -> Financials:
     """원본 계정 줄 → 지표 계산용 Financials."""
     values = {spec.name: _find(raw.lines, spec) for spec in FIELD_SPECS}
+    values["revenue"] = _revenue(raw.lines)
     values["interest_expense"], source = _interest_expense(raw.lines, values["interest_expense"])
     values["trade_receivables"], receivable_source = _trade_receivables(raw.lines)
     values["capex"], capex_source = _capex(raw.lines)

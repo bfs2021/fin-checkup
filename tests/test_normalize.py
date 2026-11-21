@@ -406,3 +406,43 @@ def test_currency_is_the_majority_when_lines_disagree():
         for i in range(3)
     ] + [AccountLine(sj_div="BS", account_id="k", account_nm="k", thstrm_amount=1.0, currency="KRW")]
     assert normalize_statements(raw(*lines)).currency == "USD"
+
+
+# ── 매출액: 금융지주의 보험 부문 줄 · 0 으로 적힌 머리 줄 ─────────────────
+
+
+def test_insurance_revenue_of_a_bank_groups_subsidiary_is_not_revenue():
+    """은행·금융지주의 '보험수익' 은 보험 자회사 한 부문이다. 매출로 쓰면 영업이익률이 수천 %가 된다.
+
+    중소기업은행 2024: 보험수익 0.09조 · 이자수익 18.95조 · 영업이익 3.59조 → 영업이익률 3,845% 🟢.
+    """
+    fin = normalize_statements(raw(
+        line("CIS", "ifrs-full_InsuranceRevenue", "보험수익", 93_466.0),
+        line("CIS", "ifrs-full_RevenueFromInterest", "이자수익", 18_954_860.0),
+        line("CIS", "dart_OperatingIncomeLoss", "영업이익", 3_594_087.0),
+    ))
+    assert fin.revenue is None
+
+
+def test_insurers_insurance_revenue_is_still_revenue():
+    """보험사는 보험수익이 본업 매출이다 — 운용 이자수익보다 크다(삼성화재 2024: 17.28조 vs 2.25조)."""
+    fin = normalize_statements(raw(
+        line("IS", "ifrs-full_InsuranceRevenue", "보험수익", 17_276.0),
+        line("IS", "-표준계정코드 미사용-", "이자수익", 2_251.0),
+    ))
+    assert fin.revenue == 17_276.0
+
+
+def test_zero_header_line_does_not_hide_the_real_revenue_line():
+    """한화생명 2023: '영업수익' 머리 줄이 0 으로 와서 보험수익 9.79조를 가렸다 — 매출 0 → 증가율 ⚫."""
+    fin = normalize_statements(raw(
+        line("IS", "-표준계정코드 미사용-", "영업수익", 0.0),
+        line("IS", "ifrs-full_InsuranceRevenue", "보험수익", 9_790.0),
+    ))
+    assert fin.revenue == 9_790.0
+
+
+def test_revenue_reported_as_zero_stays_zero():
+    """매출이 정말 0 인 회사(기업인수목적회사 등)는 0 이다 — 다른 후보가 없으면 없다고 하지 않는다."""
+    fin = normalize_statements(raw(line("IS", "ifrs-full_Revenue", "매출액", 0.0)))
+    assert fin.revenue == 0.0
