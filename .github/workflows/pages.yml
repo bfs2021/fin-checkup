@@ -134,6 +134,12 @@ jobs:
             cp _site-data/disclosures.json site-out/data/disclosures.json
           fi
 
+      # 넘지 않는 선을 산출물에서 직접 확인한다(면책·계산식·CSP·외부 스크립트·인증키 — site/guard.py).
+      # 하나라도 걸리면 배포하지 않는다.
+      - name: 산출물 가드
+        if: steps.snapshot.outputs.found == 'true'
+        run: uv run python -m fin_checkup.cli site check site-out
+
       - uses: actions/upload-pages-artifact@v5
         if: steps.snapshot.outputs.found == 'true'
         with:
