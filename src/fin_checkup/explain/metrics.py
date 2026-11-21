@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from fin_checkup.explain._korean import if_, is_
 from fin_checkup.metrics import engine
 from fin_checkup.metrics.engine import MONEY, Category, MetricDef
 from fin_checkup.metrics.sector import Sector
@@ -32,8 +33,11 @@ class SectorCaveat:
 class SpecialRule:
     """경계값 밖에서 엔진이 신호를 정하는 경우 (자본잠식·무차입·흑자전환 등)."""
 
+    #: 규칙 설명 ("~면 ~로 표시해요"). 지표 해설 페이지용.
     when: str
     signal: Signal
+    #: 이 회사에 그 규칙이 적용됐을 때의 사실 문장 ("~라 ~했어요"). '왜 이 색' 문장용.
+    fact: str
 
 
 @dataclass(frozen=True)
@@ -112,11 +116,6 @@ def band_ranges(band: Band, unit: str) -> dict[Signal, str]:
     return ranges
 
 
-def _if(phrase: str) -> str:
-    """'7% 이상' → '7% 이상이면', '100% 이하' → '100% 이하면'."""
-    return phrase + ("면" if phrase.endswith(("이하", "초과")) else "이면")
-
-
 def threshold_text(key: str, sector: Sector = Sector.GENERAL) -> str:
     """경계값 설명 문장. 숫자는 전부 engine 의 Band 에서 온다."""
     spec = _engine_def(key)
@@ -127,10 +126,10 @@ def threshold_text(key: str, sector: Sector = Sector.GENERAL) -> str:
     if band is None:
         return "업종마다 차이가 커서 경계값을 두지 않아요. 값만 ⚪ 측정값으로 보여 줘요."
     parts = [
-        f"{_if(phrase)} {signal.emoji} {signal.label}"
+        f"{if_(phrase)} {signal.emoji} {signal.label}"
         for signal, phrase in band_ranges(band, spec.unit).items()
     ]
-    text = ", ".join(parts) + "이에요."
+    text = is_(", ".join(parts)) + "."
     if band.good == band.warn:
         text += " 🟡 주의 구간은 없어요."
     if sector is not Sector.GENERAL and spec.sector_bands and sector in spec.sector_bands:
@@ -155,13 +154,20 @@ _GROWTH_BASIS = (
 def _turnaround_rules(noun: str) -> tuple[SpecialRule, ...]:
     return (
         SpecialRule(
-            f"작년 {noun}이 적자였는데 올해 흑자가 되면 증가율 대신 '흑자 전환'으로 표시해요.", Signal.GREEN
+            f"작년 {noun}이 적자였는데 올해 흑자가 되면 증가율 대신 '흑자 전환'으로 표시해요.",
+            Signal.GREEN,
+            f"작년 {noun} 적자에서 올해 흑자로 돌아섰어요(흑자 전환).",
         ),
         SpecialRule(
             f"작년에 이어 올해도 {noun}이 적자면 손실 폭이 줄었든 커졌든 '적자 지속'으로 표시해요.",
             Signal.RED,
+            f"작년에 이어 올해도 {noun}이 적자예요(적자 지속).",
         ),
-        SpecialRule(f"작년 {noun}이 정확히 0이면 증가율을 낼 수 없어 비워 둬요.", Signal.UNKNOWN),
+        SpecialRule(
+            f"작년 {noun}이 정확히 0이면 증가율을 낼 수 없어 비워 둬요.",
+            Signal.UNKNOWN,
+            f"작년 {noun}이 정확히 0이라 증가율을 낼 수 없어요.",
+        ),
     )
 
 
@@ -209,7 +215,11 @@ _ENTRIES: tuple[MetricExplainer, ...] = (
             "연말 자기자본 하나로 나눠요. 기초·기말 평균으로 나누는 곳과는 값이 조금 다를 수 있어요.",
         ),
         special_rules=(
-            SpecialRule("자기자본이 0 이하(자본잠식)면 비율이 뜻을 잃어 계산하지 않아요.", Signal.UNKNOWN),
+            SpecialRule(
+                "자기자본이 0 이하(자본잠식)면 비율이 뜻을 잃어 계산하지 않아요.",
+                Signal.UNKNOWN,
+                "자기자본이 0 이하(자본잠식)라 비율이 뜻을 잃어 계산하지 않았어요.",
+            ),
         ),
     ),
     MetricExplainer(
@@ -248,7 +258,11 @@ _ENTRIES: tuple[MetricExplainer, ...] = (
             ),
         ),
         special_rules=(
-            SpecialRule("자기자본이 0 이하(자본잠식)면 비율을 계산하지 않고 바로 🔴로 표시해요.", Signal.RED),
+            SpecialRule(
+                "자기자본이 0 이하(자본잠식)면 비율을 계산하지 않고 바로 🔴로 표시해요.",
+                Signal.RED,
+                "자기자본이 0 이하(자본잠식)라 비율 없이 🔴로 표시했어요.",
+            ),
         ),
     ),
     MetricExplainer(
@@ -292,7 +306,9 @@ _ENTRIES: tuple[MetricExplainer, ...] = (
         ),
         special_rules=(
             SpecialRule(
-                "이자비용이 0으로 공시되면 사실상 빚이 없다고 보고 값 없이 🟢로 표시해요.", Signal.GREEN
+                "이자비용이 0으로 공시되면 사실상 빚이 없다고 보고 값 없이 🟢로 표시해요.",
+                Signal.GREEN,
+                "이자비용이 0으로 공시돼 사실상 빚이 없다고 보고 🟢로 표시했어요.",
             ),
         ),
     ),
@@ -324,7 +340,13 @@ _ENTRIES: tuple[MetricExplainer, ...] = (
             "다른 회사를 사들이거나 사업을 떼어 내면 본업과 상관없이 크게 움직여요.",
             "작년 재무가 없으면 계산하지 않아요(⚫).",
         ),
-        special_rules=(SpecialRule("작년 매출액이 0이면 증가율을 낼 수 없어 비워 둬요.", Signal.UNKNOWN),),
+        special_rules=(
+            SpecialRule(
+                "작년 매출액이 0이면 증가율을 낼 수 없어 비워 둬요.",
+                Signal.UNKNOWN,
+                "작년 매출액이 0이라 증가율을 낼 수 없어요.",
+            ),
+        ),
     ),
     MetricExplainer(
         key="operating_income_growth",
@@ -363,7 +385,9 @@ _ENTRIES: tuple[MetricExplainer, ...] = (
         ),
         special_rules=(
             SpecialRule(
-                "장부상 흑자인데 영업현금이 유출됐으면 🔴로 표시하고 그 사실을 따로 적어요.", Signal.RED
+                "장부상 흑자인데 영업현금이 유출됐으면 🔴로 표시하고 그 사실을 따로 적어요.",
+                Signal.RED,
+                "장부상으로는 흑자인데 영업현금은 빠져나갔어요.",
             ),
         ),
     ),
@@ -381,6 +405,7 @@ _ENTRIES: tuple[MetricExplainer, ...] = (
             SpecialRule(
                 "적자 회사는 비율의 뜻이 뒤집혀(적자에 현금이 들어와도 음수가 됨) 계산하지 않아요. 영업활동현금흐름 자체를 보세요.",
                 Signal.NOT_APPLICABLE,
+                "올해 적자라 이 비율은 뜻이 뒤집혀 계산하지 않았어요. 영업활동현금흐름 자체를 보세요.",
             ),
         ),
     ),
@@ -436,7 +461,9 @@ _ENTRIES: tuple[MetricExplainer, ...] = (
         ),
         special_rules=(
             SpecialRule(
-                "재고자산이 0으로 공시된 회사(서비스업 등)는 회전율을 계산하지 않아요.", Signal.NOT_APPLICABLE
+                "재고자산이 0으로 공시된 회사(서비스업 등)는 회전율을 계산하지 않아요.",
+                Signal.NOT_APPLICABLE,
+                "재고자산이 0으로 공시돼 회전율을 계산하지 않았어요.",
             ),
         ),
     ),
@@ -458,7 +485,11 @@ _ENTRIES: tuple[MetricExplainer, ...] = (
             ),
         ),
         special_rules=(
-            SpecialRule("매출채권이 0으로 공시된 회사는 회전율을 계산하지 않아요.", Signal.NOT_APPLICABLE),
+            SpecialRule(
+                "매출채권이 0으로 공시된 회사는 회전율을 계산하지 않아요.",
+                Signal.NOT_APPLICABLE,
+                "매출채권이 0으로 공시돼 회전율을 계산하지 않았어요.",
+            ),
         ),
     ),
 )
