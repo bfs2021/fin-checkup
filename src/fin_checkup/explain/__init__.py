@@ -4,6 +4,13 @@ UI 를 모른다. 사이트·Streamlit·CLI 가 같은 문장을 쓴다. 숫자(
 `fin_checkup.metrics` 에서 가져오고, 사고팔라는 말은 쓰지 않는다 (`explain.banned`).
 """
 
+from fin_checkup.explain.disclosures import (
+    DISCLOSURE_EXPLAINERS,
+    HOW_TO_READ_ON_DART,
+    DisclosureExplainer,
+    disclosure_explainers,
+    get_disclosure_explainer,
+)
 from fin_checkup.explain.metrics import (
     METRIC_EXPLAINERS,
     MetricExplainer,
@@ -23,6 +30,11 @@ from fin_checkup.explain.redflags import (
 from fin_checkup.explain.why import why_color
 
 __all__ = [
+    "DISCLOSURE_EXPLAINERS",
+    "HOW_TO_READ_ON_DART",
+    "DisclosureExplainer",
+    "disclosure_explainers",
+    "get_disclosure_explainer",
     "METRIC_EXPLAINERS",
     "MetricExplainer",
     "RED_FLAG_EXPLAINERS",
