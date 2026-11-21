@@ -54,6 +54,9 @@ def detect_changes(
         before = prior_by_key.get(metric.key)
         if before is None:
             continue
+        # ⊘ 는 "이 업종엔 판정하지 않는다" 다. 경계값이 없어 방향도 없다 — 급변이라 부를 근거가 없다.
+        if Signal.NOT_APPLICABLE in (metric.signal, before.signal):
+            continue
 
         downgraded = SEVERITY[metric.signal] > SEVERITY[before.signal] and {
             metric.signal,

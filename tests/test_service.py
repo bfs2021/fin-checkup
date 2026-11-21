@@ -331,3 +331,17 @@ async def test_backfill_includes_growth_metrics(service, cache):
     }
     assert "revenue_growth" in keys, "전년이 있는데 성장성이 안 채워졌다"
     assert "operating_margin" in keys
+
+
+async def test_self_comparison_skips_not_applicable_metrics(service, cache):
+    """⊘ 지표에 "작년 대비 개선/악화" 를 붙이면 판정하지 않겠다던 지표를 판정하게 된다."""
+    from fin_checkup.models import Company
+
+    cache.save_company(Company(corp_code="00126380", corp_name="KB금융", industry_code="64992"))
+    cache.save_statements(statements(2023, 1000.0))
+    cache.save_statements(statements(2024, 1200.0))
+    result = await service.run(SAMSUNG, end_year=2024, allow_fetch=False)
+    assert result is not None
+    assert result.result.by_key("debt_ratio").signal.value == "not_applicable"
+    assert "debt_ratio" not in result.deltas
+    assert "operating_margin" in result.deltas, "판정하는 지표의 작년 대비는 그대로 둔다"
