@@ -156,14 +156,34 @@ h3 { font-size: .9rem; color: var(--ink-muted); margin: 1.2rem 0 .5rem; letter-s
 
 /* ── 랜딩 ─────────────────────────────────────────────── */
 
-.fc-landing { padding: 2.5rem 0 1rem; max-width: 36rem; }
+.fc-landing { padding: 1.6rem 0 .4rem; max-width: 36rem; }
 .fc-landing h1 { font-size: 1.6rem; }
 .fc-lead { color: var(--ink-muted); margin: 0 0 1.2rem; }
 .fc-landing .fc-search-input { font-size: 1.1rem; padding: .8rem 1rem; }
-.fc-landing-links { margin: 1rem 0 .4rem; }
+.fc-landing-links { margin: .5rem 0 .3rem; }
 .fc-resume { margin: .2rem 0 .6rem; }
 .fc-resume a { margin-left: .4rem; }
 .fc-asof { font-size: .85rem; color: var(--ink-muted); font-variant-numeric: tabular-nums; }
+/* 결과 예시 — 고정 규칙으로 고른 회사 한눈에 보기의 첫 묶음 (index.html). */
+.fc-example {
+  max-width: 36rem; margin: .6rem 0 1rem; padding: .8rem .9rem;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+}
+.fc-example h2 { font-size: 1rem; margin: 0; }
+.fc-example-co { display: block; font-size: .85rem; font-weight: 400; color: var(--ink-muted); margin-top: .1rem; }
+.fc-example .fc-chips { margin: .45rem 0; }
+.fc-example-group { font-weight: 600; font-size: .85rem; margin: .5rem 0 .25rem; }
+.fc-example-rows { list-style: none; padding: 0; margin: 0; display: grid; gap: .25rem; }
+.fc-example-rows li { border-left: 3px solid var(--sig); background: var(--tint); border-radius: 6px; }
+.fc-example-rows a {
+  display: flex; align-items: baseline; gap: .5rem; padding: .2rem .5rem;
+  color: var(--ink); text-decoration: none; font-size: .9rem;
+}
+.fc-example-rows a:hover .fc-example-label { text-decoration: underline; }
+.fc-example-rows .fc-sig { background: var(--surface); }
+.fc-example-value { margin-left: auto; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.fc-example-more { font-size: .88rem; margin: .5rem 0 .2rem; }
+.fc-example .fc-hint { margin-bottom: 0; }
 .fc-not-found-links { margin: 1.2rem 0 0; padding-left: 1.1rem; display: grid; gap: .3rem; }
 
 /* ── 신호 ─────────────────────────────────────────────── */
@@ -380,6 +400,12 @@ h3 { font-size: .9rem; color: var(--ink-muted); margin: 1.2rem 0 .5rem; letter-s
 .fc-season p { margin: .3rem 0; }
 .fc-season-list { margin: .3rem 0 .5rem; padding-left: 1.1rem; font-variant-numeric: tabular-nums; }
 .fc-season-used { font-weight: 600; }
+/* 첫 화면: 기준일 한 줄, 나머지는 눌러 펼친다. */
+.fc-season-compact { margin: .5rem 0 0; padding: 0; background: none; border: 0; font-size: .85rem; color: var(--ink-muted); }
+.fc-season-compact summary { cursor: pointer; font-variant-numeric: tabular-nums; }
+.fc-season-more { color: var(--link); text-decoration: underline; white-space: nowrap; }
+.fc-season-compact details[open] .fc-season-more { display: none; }
+.fc-season-compact details[open] { color: var(--ink); background: var(--surface-sunk); border: 1px solid var(--border); border-radius: 8px; padding: .6rem .8rem; }
 
 /* ── 회사 페이지 동작 줄 · 링크 공유 (_actions.html · _share.html) ── */
 
