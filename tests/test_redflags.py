@@ -136,3 +136,16 @@ def test_zombie_streak_fires_on_cash_flow_interest_paid():
         for y in (2022, 2023, 2024)
     ]
     assert "zombie_streak" in keys(detect_red_flags(history))
+
+
+def test_loss_streak_reference_matches_current_kosdaq_rule():
+    """코스닥 '4년 연속 영업손실 → 관리종목' 요건은 2022년 말 상장규정 개정으로 없어졌다.
+
+    지금은 5년 연속 영업손실이 투자주의환기종목 지정 사유다 (KRX 「코스닥상장법인 정기결산 관련
+    투자유의사항」 2025-02). 없어진 규정을 사실처럼 적으면 신호 하나가 거짓 규제 결과를 말한다.
+    """
+    history = [fin(y, operating_income=-10) for y in range(2020, 2025)]
+    flag = next(f for f in detect_red_flags(history) if f.key == "consecutive_operating_loss")
+    assert "관리종목 지정 요건이다" not in flag.reference
+    assert "없어졌다" in flag.reference
+    assert "5년 연속 영업손실" in flag.reference and "투자주의환기종목" in flag.reference
