@@ -484,10 +484,11 @@ class Cache:
         ).fetchone()
         return int(row[0]) if row else 0
 
-    def list_with_statements(
-        self, bsns_year: int, limit: int = 2000, listed_only: bool = True
-    ) -> list[str]:
+    def list_with_statements(self, bsns_year: int, listed_only: bool = True) -> list[str]:
         """해당 연도 재무가 캐시에 있는 기업. 시장 전체 대조군('전체 상장사')의 모집단이다.
+
+        상한을 두지 않는다 — 예전 기본값 `limit=2000` 이 corp_code 앞쪽 2,000곳에서 대조군을
+        조용히 잘랐다(상장사 ~2,540곳). 잘린 쪽이 늦게 등록된 회사들이라 중앙값이 치우쳤다.
 
         `listed_only=False` 는 지표 미리 계산(backfill)용 — 상장 여부와 무관하게 재무가 있는 전부.
         """
@@ -498,8 +499,8 @@ class Cache:
         )
         rows = self.conn.execute(
             "SELECT DISTINCT corp_code FROM statement_lines WHERE bsns_year = ? "
-            f"{listed}ORDER BY corp_code LIMIT ?",
-            [bsns_year, limit],
+            f"{listed}ORDER BY corp_code",
+            [bsns_year],
         ).fetchall()
         return [r[0] for r in rows]
 
