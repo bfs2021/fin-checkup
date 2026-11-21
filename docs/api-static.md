@@ -41,3 +41,4 @@
 | `delta` | 작년 대비 `previous` · `current` · `improved`(같으면 `null`) · `summary`. 작년 값이 없거나 ⊘ 면 `null` |
 
 판정 규칙·경계값의 근거는 `src/fin_checkup/metrics/engine.py`, 생성 코드는 `src/fin_checkup/site/pages/api.py`.
+쓰는 예: [`examples/`](../examples/README.md) — 두 회사를 나란히 출력하는 스크립트와 단계별 설명.
