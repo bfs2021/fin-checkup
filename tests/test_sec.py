@@ -7,7 +7,7 @@ import respx
 from fin_checkup.config import Settings
 from fin_checkup.metrics.engine import checkup
 from fin_checkup.metrics.signals import Signal
-from fin_checkup.models import InterestSource
+from fin_checkup.models import InterestSource, ReceivableSource
 from fin_checkup.sec.client import SecClient, SecError
 from fin_checkup.sec.normalize import normalize_company_facts
 
@@ -202,6 +202,16 @@ def test_fiscal_years_ending_in_early_january_belong_to_the_prior_year():
     )
     assert normalize_company_facts(data, 2021).total_assets == 100
     assert normalize_company_facts(data, 2022).total_assets == 120
+
+
+@pytest.mark.parametrize("tag,source", [
+    ("AccountsReceivableNetCurrent", ReceivableSource.TRADE),
+    ("ReceivablesNetCurrent", ReceivableSource.TRADE_AND_OTHER),
+])
+def test_receivable_source_follows_the_tag(tag, source):
+    fin = normalize_company_facts(facts(**{tag: units(entry("2023-09-30", 100.0))}), 2023)
+    assert fin.trade_receivables == 100.0
+    assert fin.trade_receivables_source is source
 
 
 def test_capex_is_positive():

@@ -157,6 +157,26 @@ uv run python -m fin_checkup.cli disclosures fetch --days 7 --out site-data/disc
 순액이 총액의 80% 미만인 곳이 24%(p10 13%)였다. 이걸로 🟢 를 매기면 이자 부담을 감춘다.
 SEC 값은 대조군(`metric_values`)에 들어가지 않아 마이그레이션은 없다.
 
+### 매출채권회전율의 분모 — 순수 매출채권을 먼저
+
+합계 태그 `ifrs-full_TradeAndOtherCurrentReceivables` 를 먼저 잡던 때는 매출채권 줄이 따로 있어도
+합계가 분모였고, 그 태그를 미수금 묶음('기타수취채권'·'기타유동채권')에 붙인 회사는 미수금으로
+나눴다(2024 상장사 219곳 값이 바뀌었다 — 바뀐 곳의 새 값/옛 값 중앙값 0.34). 이제 순서는
+(`dart/normalize.py::_trade_receivables`, 출처는 `Financials.trade_receivables_source`):
+
+| 출처 | 2024 | 처리 |
+|---|---|---|
+| 매출채권 단독 (`dart_ShortTermTradeReceivable`·`ifrs-full_CurrentTradeReceivables`·이름 '매출채권') | 1,116 | 그대로 |
+| 매출채권및기타채권 합계 (이름에 '매출채권'이 든 줄만) | 1,298 | 그대로 + "합계 기준" 비고 |
+| 미수금·기타금융자산 줄뿐 | — | ⚫ (매출채권이 아니다) |
+
+합계만 있을 때 ⚪ 대체값으로 빼지 않은 근거: 둘 다 공시한 99곳에서 매출채권 ÷ 합계가 중앙값 0.957
+(p25 0.85, p10 0.47)이라, 회사 사이 회전율 차이(2024 사분위 4.6~9.4회)보다 훨씬 작다. 상장사 절반을
+대조군에서 빼면 분포가 더 틀린다. 해마다 출처가 바뀌는 회사는 67곳(2.9%)이라 전년 비교도 그대로 둔다.
+옛 `metric_values` 의 매출채권회전율은 다시 열 때 지운다(`migrations.metric_values_receivable_source`)
+— **`cli backfill`** 로 다시 채운다. SEC 는 `AccountsReceivableNetCurrent` = 단독,
+`ReceivablesNetCurrent` = 합계로 같은 비고를 단다.
+
 ## 5. 계정과 키
 
 - 비밀번호를 받지 않는다 — 저장·재설정·유출 대응을 떠안지 않기 위해서

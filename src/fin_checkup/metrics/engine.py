@@ -14,7 +14,7 @@ from enum import Enum
 
 from fin_checkup.metrics.sector import Sector
 from fin_checkup.metrics.signals import SEVERITY, Band, Signal
-from fin_checkup.models import Financials, InterestSource
+from fin_checkup.models import Financials, InterestSource, ReceivableSource
 
 #: 금액 지표의 unit. 실제 통화(원/달러)는 CheckupResult.currency에서 결정된다.
 #: 여기에 "원"을 박아두면 미국 기업 금액에도 원이 붙는다.
@@ -351,6 +351,33 @@ def _zero_denominator_is_not_applicable(field: str, what: str):
     return override
 
 
+#: 매출채권 단독 줄이 없어 매출채권및기타채권 합계로 나눴을 때. 합계 ≥ 매출채권이라 회전율은
+#: 낮게만 틀린다. 둘 다 공시한 2024 상장사 99곳에서 매출채권은 합계의 중앙값 95.7%(p25 85%)라
+#: 대조군·전년 비교에는 그대로 둔다 — 회사 사이 회전율 차이(사분위 범위 몇 배)보다 훨씬 작다.
+RECEIVABLE_AGGREGATE_NOTE = (
+    "매출채권 단독 계정이 없어 매출채권및기타채권 합계(미수금 등 포함)로 계산 — "
+    "실제보다 낮게 나올 수 있다."
+)
+
+
+def _receivable_turnover_override(
+    cur: Financials, p: Financials | None, value: float | None
+) -> tuple[Signal, str] | None:
+    forced = _zero_denominator_is_not_applicable("trade_receivables", "매출채권")(cur, p, value)
+    if (
+        forced is not None
+        and forced[0] is Signal.NEUTRAL
+        and cur.trade_receivables_source is ReceivableSource.TRADE_AND_OTHER
+    ):
+        return Signal.NEUTRAL, f"{forced[1]} {RECEIVABLE_AGGREGATE_NOTE}"
+    return forced
+
+
+#: 값의 계산 근거(분모를 어느 계정에서 가져왔나)를 밝히는 비고. 판정을 바꾸지 않는 사실이라
+#: '왜 이 색' 문장에 그대로 덧붙는다(explain.why).
+BASIS_NOTES: tuple[str, ...] = (INTEREST_PAID_NOTE, RECEIVABLE_AGGREGATE_NOTE)
+
+
 METRIC_DEFS: tuple[MetricDef, ...] = (
     # ── ① 수익성 ────────────────────────────────────────────────
     MetricDef(
@@ -478,7 +505,7 @@ METRIC_DEFS: tuple[MetricDef, ...] = (
         "외상값을 얼마나 빨리 회수하는지. 낮아지면 못 받는 돈이 늘고 있을 수 있다.",
         "매출액 ÷ 매출채권",
         lambda c, p: (_ratio(c.revenue, c.trade_receivables), ""),
-        None, _zero_denominator_is_not_applicable("trade_receivables", "매출채권"),
+        None, _receivable_turnover_override,
     ),
 )
 

@@ -1,7 +1,14 @@
 from __future__ import annotations
 
 from fin_checkup.dart.normalize import normalize_statements
-from fin_checkup.models import AccountLine, FsDiv, InterestSource, RawStatements, ReportCode
+from fin_checkup.models import (
+    AccountLine,
+    FsDiv,
+    InterestSource,
+    RawStatements,
+    ReceivableSource,
+    ReportCode,
+)
 
 
 def line(sj_div: str, account_id: str, account_nm: str, amount: float | None) -> AccountLine:
@@ -70,6 +77,66 @@ def test_account_name_matching_ignores_spaces_and_loss_suffix():
     assert fin.operating_income == -50.0
     assert fin.net_income == -80.0
     assert fin.trade_receivables == 300.0
+    assert fin.trade_receivables_source is ReceivableSource.TRADE_AND_OTHER
+
+
+# ── 매출채권: 순수 매출채권 줄을 합계 줄보다 먼저 ─────────────────────
+# 2024 상장사 1,311곳이 ifrs-full_TradeAndOtherCurrentReceivables(합계 태그)로 먼저 잡혔다.
+# 그 태그를 '기타수취채권'·'기타유동채권' 줄에 붙이는 회사도 150곳 남짓이라 매출채권이 아닌
+# 미수금이 분모가 됐다.
+
+
+def test_pure_trade_receivables_line_beats_the_aggregate_tag():
+    fin = normalize_statements(raw(
+        line("BS", "ifrs-full_TradeAndOtherCurrentReceivables", "매출채권및기타유동채권", 500.0),
+        line("BS", "dart_ShortTermTradeReceivable", "매출채권", 420.0),
+    ))
+    assert fin.trade_receivables == 420.0
+    assert fin.trade_receivables_source is ReceivableSource.TRADE
+
+
+def test_ifrs_current_trade_receivables_id_is_pure():
+    fin = normalize_statements(raw(
+        line("BS", "ifrs-full_TradeAndOtherCurrentReceivables", "매출채권 및 기타채권", 500.0),
+        line("BS", "ifrs-full_CurrentTradeReceivables", "유동매출채권", 410.0),
+    ))
+    assert fin.trade_receivables == 410.0
+    assert fin.trade_receivables_source is ReceivableSource.TRADE
+
+
+def test_other_receivables_line_with_the_aggregate_tag_is_not_trade_receivables():
+    # 매출채권은 따로 적고 미수금 묶음에 합계 태그를 붙인 회사. 옛 규칙은 기타채권 30 을 골랐다.
+    fin = normalize_statements(raw(
+        line("BS", "-표준계정코드 미사용-", "매출채권", 400.0),
+        line("BS", "ifrs-full_TradeAndOtherCurrentReceivables", "기타수취채권", 30.0),
+    ))
+    assert fin.trade_receivables == 400.0
+    assert fin.trade_receivables_source is ReceivableSource.TRADE
+
+
+def test_other_receivables_alone_are_not_trade_receivables():
+    fin = normalize_statements(raw(
+        line("BS", "ifrs-full_TradeAndOtherCurrentReceivables", "기타유동채권", 30.0),
+    ))
+    assert fin.trade_receivables is None
+    assert fin.trade_receivables_source is None
+
+
+def test_noncurrent_trade_receivables_are_not_picked():
+    fin = normalize_statements(raw(
+        line("BS", "ifrs-full_NoncurrentTradeReceivables", "매출채권", 70.0),
+        line("BS", "ifrs-full_TradeAndOtherCurrentReceivables", "매출채권및기타채권", 500.0),
+    ))
+    assert fin.trade_receivables == 500.0
+    assert fin.trade_receivables_source is ReceivableSource.TRADE_AND_OTHER
+
+
+def test_aggregate_only_is_kept_with_its_source():
+    fin = normalize_statements(raw(
+        line("BS", "ifrs-full_TradeAndOtherCurrentReceivables", "매출채권및기타채권", 500.0),
+    ))
+    assert fin.trade_receivables == 500.0
+    assert fin.trade_receivables_source is ReceivableSource.TRADE_AND_OTHER
 
 
 def test_missing_accounts_stay_none_not_zero():

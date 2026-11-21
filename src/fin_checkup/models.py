@@ -177,6 +177,24 @@ class InterestSource(str, Enum):
         return self in (InterestSource.FINANCE_COSTS, InterestSource.NET_INTEREST)
 
 
+class ReceivableSource(str, Enum):
+    """매출채권(`Financials.trade_receivables`)을 어느 줄에서 가져왔나.
+
+    2024 상장사 2,542곳 중 절반(1,298곳)은 '매출채권및기타채권' 합계 줄만 공시한다. 미수금·
+    미수수익이 섞여 매출채권보다 크다 — 둘 다 공시한 99곳에서 순수 매출채권은 합계의 중앙값
+    95.7%(p25 85%, p10 47%)였다.
+    """
+
+    #: 매출채권 단독 줄 (dart_ShortTermTradeReceivable · ifrs-full_CurrentTradeReceivables · '매출채권').
+    TRADE = "trade"
+    #: 매출채권및기타채권 합계 줄. 미수금 등이 섞인다.
+    TRADE_AND_OTHER = "trade_and_other"
+
+    @property
+    def label(self) -> str:
+        return {"trade": "매출채권", "trade_and_other": "매출채권및기타채권 합계"}[self.value]
+
+
 class Financials(BaseModel):
     """지표 계산에 필요한 계정만 정규화한 결과.
 
@@ -199,6 +217,8 @@ class Financials(BaseModel):
     current_liabilities: float | None = None
     inventories: float | None = None
     trade_receivables: float | None = None
+    #: trade_receivables 의 출처. 값이 없으면 None.
+    trade_receivables_source: ReceivableSource | None = None
     capital_stock: float | None = None  # 자본금 — 자본잠식률 계산에 필요
 
     # 손익계산서

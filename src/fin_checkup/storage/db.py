@@ -172,6 +172,9 @@ _MIGRATION_FOREIGN_MONEY = "migrations.metric_values_foreign_money"
 #: 이자보상배율은 2026-11 까지 이자비용이 없으면 금융원가로 계산돼 대조군에 들어갔다(2024 상장사 94%).
 #: 이제 금융원가 대체값은 대조군에서 빠지므로 옛 값을 지우고 `cli backfill` 로 다시 채운다.
 _MIGRATION_INTEREST_SOURCE = "migrations.metric_values_interest_source"
+#: 매출채권회전율은 2026-11 까지 합계 태그(TradeAndOtherCurrentReceivables)를 먼저 잡아, 그 태그를
+#: 미수금 줄('기타수취채권' 등)에 붙인 회사는 미수금으로 나눈 값이 대조군에 들어갔다.
+_MIGRATION_RECEIVABLE_SOURCE = "migrations.metric_values_receivable_source"
 
 
 class CacheLocked(RuntimeError):
@@ -271,6 +274,9 @@ class Cache:
             # 지운 뒤 backfill 전까지는 이 지표의 대조군이 비어 있다(틀린 분포보다 낫다).
             self.conn.execute("DELETE FROM metric_values WHERE metric_key = 'interest_coverage'")
             self.set_meta(_MIGRATION_INTEREST_SOURCE, "done")
+        if self.get_meta(_MIGRATION_RECEIVABLE_SOURCE) is None:
+            self.conn.execute("DELETE FROM metric_values WHERE metric_key = 'receivable_turnover'")
+            self.set_meta(_MIGRATION_RECEIVABLE_SOURCE, "done")
 
     def __enter__(self) -> Cache:
         return self

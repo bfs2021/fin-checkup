@@ -11,6 +11,7 @@ from fin_checkup.models import (
     FsDiv,
     InterestSource,
     RawStatements,
+    ReceivableSource,
     ReportCode,
 )
 
@@ -448,3 +449,27 @@ def test_samsung_without_cash_flow_line_is_not_judged():
     m = get(checkup(_samsung_2024(with_cash_flow=False)), "interest_coverage")
     assert m.value == pytest.approx(2.52, abs=0.01)
     assert m.signal is Signal.NEUTRAL
+
+
+# ── 매출채권회전율: 분모의 출처 ─────────────────────────────────────
+
+
+def test_receivable_turnover_on_aggregate_is_kept_with_a_basis_note():
+    m = get(
+        checkup(fin(revenue=1000, trade_receivables=250,
+                    trade_receivables_source=ReceivableSource.TRADE_AND_OTHER)),
+        "receivable_turnover",
+    )
+    assert m.value == pytest.approx(4.0)
+    assert m.signal is Signal.NEUTRAL
+    assert m.proxy is False, "중앙값 4% 차이 — 대조군에서 빼지 않는다"
+    assert "매출채권및기타채권" in m.note and "낮게" in m.note
+
+
+def test_receivable_turnover_on_pure_line_has_no_note():
+    m = get(
+        checkup(fin(revenue=1000, trade_receivables=250,
+                    trade_receivables_source=ReceivableSource.TRADE)),
+        "receivable_turnover",
+    )
+    assert "매출채권및기타채권" not in m.note
