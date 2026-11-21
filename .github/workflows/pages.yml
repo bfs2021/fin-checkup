@@ -148,6 +148,12 @@ jobs:
         if: steps.snapshot.outputs.found == 'true'
         run: uv run python -m fin_checkup.cli site check site-out
 
+      # 내부 링크(상대경로·SITE_URL 아래 절대주소·#앵커)가 실제 파일로 이어지는지. 깨지면 배포하지 않는다.
+      # 외부 링크는 목록만 남긴다 — 네트워크를 부르지 않고, 남의 사이트 장애로 배포를 막지 않는다.
+      - name: 링크 검사
+        if: steps.snapshot.outputs.found == 'true'
+        run: uv run python -m fin_checkup.cli site links site-out --base-url "$SITE_URL"
+
       - uses: actions/upload-pages-artifact@v5
         if: steps.snapshot.outputs.found == 'true'
         with:

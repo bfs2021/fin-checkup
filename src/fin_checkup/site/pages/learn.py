@@ -25,6 +25,7 @@ from fin_checkup.explain.worked import ROUNDING_NOTE, money_text
 from fin_checkup.metrics.signals import Signal
 from fin_checkup.site.context import CompanyEntry, Site
 from fin_checkup.site.examples import RULE_TEXT, default_example
+from fin_checkup.site.pages.same_sector import same_sector
 from fin_checkup.site.registry import Output, page
 from fin_checkup.site.related import next_reads
 from fin_checkup.site.view import CompanyView, SignalView, company_view
@@ -119,6 +120,8 @@ class FirstRead:
     sample_metric_label: str
     sample_metric_easy: str
     sample_formula: str
+    #: 예시 회사 페이지에 '같은 업종 회사' 섹션(#same-sector)이 있나. 같은 업종 상장사가 없으면 섹션이 없다.
+    has_same_sector: bool = False
 
 
 def first_read(site: Site) -> FirstRead | None:
@@ -142,6 +145,7 @@ def first_read(site: Site) -> FirstRead | None:
         sample_metric_label=sample.label,
         sample_metric_easy=sample.easy_name,
         sample_formula=sample.formula,
+        has_same_sector=same_sector(entry, site)["same_sector"] is not None,
     )
 
 
