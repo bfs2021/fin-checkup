@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import date
+from functools import cached_property
 from posixpath import normpath
 from typing import Any
 
@@ -21,6 +22,7 @@ from jinja2 import Environment
 from fin_checkup.models import CorpCode
 from fin_checkup.service import Checkup
 from fin_checkup.site.registry import Output
+from fin_checkup.site.season import SeasonView, season_view
 
 
 @dataclass(frozen=True)
@@ -92,6 +94,11 @@ class Site:
     def __post_init__(self) -> None:
         if not self.base_url.endswith("/"):
             self.base_url += "/"
+
+    @cached_property
+    def season(self) -> SeasonView:
+        """데이터 기준일·다가오는 정기 공시 기한 (`templates/_season.html`)."""
+        return season_view(self.year, self.built_on)
 
     def absolute_url(self, path: str = "") -> str:
         return self.base_url + path.lstrip("/")

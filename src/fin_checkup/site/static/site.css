@@ -284,3 +284,14 @@ h3 { font-size: .9rem; color: var(--ink-muted); margin: 1.2rem 0 .5rem; letter-s
   .fc-header .fc-search, .fc-skip { display: none; }
   body { background: #fff; }
 }
+
+/* ── 데이터 기준일 · 정기 공시 시즌 (_season.html) ─────────── */
+
+.fc-season {
+  margin: 1.2rem 0; padding: .9rem 1rem; font-size: .92rem;
+  background: var(--surface-sunk); border: 1px solid var(--border); border-radius: 8px;
+}
+.fc-season h2 { font-size: 1rem; margin: 0 0 .4rem; }
+.fc-season p { margin: .3rem 0; }
+.fc-season-list { margin: .3rem 0 .5rem; padding-left: 1.1rem; font-variant-numeric: tabular-nums; }
+.fc-season-used { font-weight: 600; }
