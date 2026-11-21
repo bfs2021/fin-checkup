@@ -519,7 +519,7 @@ async def cmd_site_build(args: argparse.Namespace) -> int:
         per = seconds / n * 1000 if n else 0.0
         print(
             f"  공유 카드 PNG {n:,}장 · {seconds:.1f}초 · 장당 {per:.0f}ms "
-            f"(프로세스 {args.image_workers}개)"
+            f"(프로세스 최대 {args.image_workers}개)"
         )
     if report.image_warning:
         # GitHub Actions 에선 워크플로 요약에 경고 주석으로 뜬다.
