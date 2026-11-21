@@ -564,7 +564,7 @@ async def cmd_site_build(args: argparse.Namespace) -> int:
 async def cmd_site_check(args: argparse.Namespace) -> int:
     """빌드된 사이트가 넘지 않는 선을 지키는지 (면책·계산식·CSP·외부 스크립트·저장소·인증키)."""
     from fin_checkup.site.buildinfo import check_freshness
-    from fin_checkup.site.guard import check_site
+    from fin_checkup.site.guard import check_coverage, check_site
 
     out = Path(args.out_dir)
     # 오래된 사업연도는 위반이 아니라 사람이 볼 경고 — 종료 코드에 넣지 않는다.
@@ -572,7 +572,7 @@ async def cmd_site_check(args: argparse.Namespace) -> int:
     if stale:
         prefix = "::warning::" if os.environ.get("GITHUB_ACTIONS") else "경고: "
         print(f"{prefix}{stale}")
-    violations = check_site(out)
+    violations = check_site(out) + check_coverage(out, args.min_companies)
     files = sum(1 for p in out.rglob("*") if p.is_file()) if out.is_dir() else 0
     if not violations:
         print(f"{out}/ — 파일 {files:,}개 검사, 위반 없음")
@@ -796,6 +796,12 @@ def main(argv: list[str] | None = None) -> int:
         "check", help="빌드된 사이트를 가드 규칙으로 검사 (위반이 있으면 종료 코드 1)"
     )
     p_site_check.add_argument("out_dir", help="site build 의 출력 폴더")
+    p_site_check.add_argument(
+        "--min-companies",
+        type=int,
+        default=0,
+        help="회사 페이지가 이보다 적으면 위반 (0 이면 검사 안 함, Pages 배포는 2000)",
+    )
     p_site_check.set_defaults(func=cmd_site_check)
     p_site_links = site_sub.add_parser(
         "links", help="빌드된 사이트의 깨진 내부 링크 검사 (있으면 종료 코드 1, 외부 링크는 보고만)"
