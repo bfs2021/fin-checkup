@@ -1,8 +1,15 @@
-{# 지표 카드 안: 동종업계 분포 위 이 회사의 위치 (charts.peer_strip). ⊘·⚫·대조군 없음이면 아무것도 내지 않는다. 순위가 아니라 분포. #}
+{#
+  지표 카드 안: 동종업계 분포 위 이 회사의 위치 (charts.peer_strip). ⊘·⚫·대조군 없음이면 아무것도 내지 않는다. 순위가 아니라 분포.
+  휴대폰에서 카드 하나가 한 화면을 넘지 않게, 숫자 요약(대조군·가운데 50%·중앙값·이 회사)은 늘 보이고 그림·범례만 눌러 펼친다.
+  계산식·경계값은 이 밖(_metrics.html)에 늘 보인다.
+#}
 {% set strip = peer_strips.get(m.key) %}
 {% if strip %}
-<figure class="fc-peer">
-  <figcaption><b>{{ strip.title }}</b> · {{ strip.spread_text }}</figcaption>
+<details class="fc-peer">
+  <summary><b>{{ strip.title }}</b> · {{ strip.spread_text }} · {{ strip.value_text }} <span class="fc-peer-more">그림</span></summary>
+  <figure>
   {{ strip.svg }}
-  <p class="fc-peer-key"><span><span class="fc-key fc-key-box" aria-hidden="true"></span>가운데 50%</span> <span><span class="fc-key fc-key-median" aria-hidden="true"></span>중앙값</span> <span><span class="fc-key fc-key-mine" aria-hidden="true"></span>{{ strip.value_text }}</span>{% if strip.has_band %} <span>· 아래 띠: 경계값 구간</span>{% endif %}</p></figure>
+  <figcaption class="fc-peer-key"><span><span class="fc-key fc-key-box" aria-hidden="true"></span>가운데 50%</span> <span><span class="fc-key fc-key-median" aria-hidden="true"></span>중앙값</span> <span><span class="fc-key fc-key-mine" aria-hidden="true"></span>{{ strip.value_text }}</span>{% if strip.has_band %} <span>· 아래 띠: 경계값 구간</span>{% endif %}</figcaption>
+  </figure>
+</details>
 {% endif %}
