@@ -60,7 +60,7 @@
 | E3 | 회사별 JSON `/api/c/<코드>.json` · `/api/index.json` (스키마: `docs/api-static.md`) | ☑ |
 | E4 | 비교 페이지 `/compare/` (`pages/compare.py` · `static/compare.js`, 검색창 고르기 모드 `data-fc-pick`) | ☑ |
 | E5 | 시장 전체 분포 페이지 `/market/` | ☑ |
-| E6 | 지표 해설 ↔ 회사 ↔ 업종 상호 링크 | ☐ |
+| E6 | 지표 해설 ↔ 회사 ↔ 업종 상호 링크 | ☑ |
 
 ### R. 돌아옴
 | # | PR | 상태 |

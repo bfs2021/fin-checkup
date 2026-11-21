@@ -18,6 +18,7 @@
         {% if m.delta_text %}<dt>작년 대비</dt><dd>{{ m.delta_text }}</dd>{% endif %}
       </dl>
       {% include "company/_peer_strip.html" %}
+      <p class="fc-metric-links"><a href="{{ url('m/' ~ m.key ~ '/') }}">{{ m.label }} 해설</a> · <a href="{{ url(metric_dist.path) }}#d-{{ m.key }}">{{ metric_dist.text }}</a></p>
       {% if m.note %}
       <p class="fc-note">{% if m.not_applicable %}<b>대신 볼 것</b> {% endif %}{{ m.note }}</p>
       {% endif %}

@@ -26,6 +26,7 @@ from fin_checkup.metrics.signals import Signal
 from fin_checkup.site.context import CompanyEntry, Site
 from fin_checkup.site.examples import RULE_TEXT, default_example
 from fin_checkup.site.registry import Output, page
+from fin_checkup.site.related import next_reads
 from fin_checkup.site.view import CompanyView, SignalView, company_view
 
 
@@ -179,8 +180,20 @@ class TermView:
     see_also: tuple[GlossaryTerm, ...]
 
 
+#: 용어 → 그 말을 실제로 쓰는 사이트 페이지 (지표·위험 신호·공시 유형 링크 말고). 정적 표.
+GLOSSARY_PAGE_LINKS: dict[str, tuple[TermLink, ...]] = {
+    "peer-group": (TermLink("s/", "업종 목록"),),
+    "ksic": (TermLink("learn/sectors/", "업종별 읽는 법"), TermLink("s/", "업종 목록")),
+    "median": (TermLink("market/", "전체 상장사 분포"),),
+    "percentile": (TermLink("market/", "전체 상장사 분포"),),
+    "dart": (TermLink("learn/disclosures/#how-to-read", "DART 원문 보는 법"),),
+    "annual-report": (TermLink("learn/first-read/", "재무제표 처음 읽기"),),
+}
+
+
 def term_view(t: GlossaryTerm) -> TermView:
-    links = [TermLink(f"m/{key}/", get_explainer(key).label) for key in t.metrics]
+    links = list(GLOSSARY_PAGE_LINKS.get(t.slug, ()))
+    links += [TermLink(f"m/{key}/", get_explainer(key).label) for key in t.metrics]
     flags = {e.key: e for e in red_flag_explainers()}
     links += [TermLink(f"learn/redflags/#{key}", flags[key].title) for key in t.red_flags]
     links += [TermLink(f"learn/disclosures/#{kind.value}", kind.label) for kind in t.disclosures]
@@ -210,16 +223,24 @@ def learn_pages(site: Site) -> Iterator[Output]:
         rule_text=RULE_TEXT,
         rounding_note=ROUNDING_NOTE,
         glossary_path=glossary_path,
+        next_reads=next_reads("learn/first-read/"),
     )
-    yield site.render("learn/redflags.html", "learn/redflags/index.html", flags=red_flag_explainers())
+    yield site.render(
+        "learn/redflags.html",
+        "learn/redflags/index.html",
+        flags=red_flag_explainers(),
+        next_reads=next_reads("learn/redflags/"),
+    )
     yield site.render(
         "learn/disclosures.html",
         "learn/disclosures/index.html",
         kinds=disclosure_explainers(),
         how_to_read=HOW_TO_READ_ON_DART,
+        next_reads=next_reads("learn/disclosures/"),
     )
     yield site.render(
         "learn/glossary.html",
         "learn/glossary/index.html",
         sections=glossary_sections(),
+        next_reads=next_reads("learn/glossary/"),
     )
