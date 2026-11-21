@@ -5,6 +5,8 @@
 (`/fin-checkup/`)든 도메인 루트든 로컬 `python -m http.server` 든 같은 산출물이 동작한다.
 
 `base_url` 은 절대주소가 꼭 필요한 곳(canonical·sitemap·OG)만 쓴다 — `site.absolute_url(path)`.
+기본값 `/` 처럼 절대주소가 아니면 canonical·og:url·og:image 를 아예 내지 않는다
+(`/c/005930/` 은 Pages 하위 경로 `/fin-checkup/` 에서 틀린 주소다) — `site.canonical_url()` 이 None.
 """
 
 from __future__ import annotations
@@ -42,6 +44,20 @@ class CompanyEntry:
         return f"c/{self.stock_code}/"
 
 
+#: 공유 카드 이미지(`og/<종목코드>.png`)를 만드는 페이지 이름. 이 이름의 `@page` 가 등록돼 있을 때만
+#: 회사 페이지가 og:image 를 낸다 — 파일이 없는 주소를 카드로 내보내지 않게.
+OG_IMAGE_PAGE = "og-image"
+
+
+def page_url(output_path: str) -> str:
+    """출력 경로 → 사이트 내 주소. `c/005930/index.html` → `c/005930/`, `index.html` → ``."""
+    if output_path == "index.html":
+        return ""
+    if output_path.endswith("/index.html"):
+        return output_path[: -len("index.html")]
+    return output_path
+
+
 def root_for(output_path: str) -> str:
     """출력 경로에서 사이트 루트로 가는 상대경로. `c/005930/index.html` → `../../`."""
     depth = output_path.count("/")
@@ -70,6 +86,8 @@ class Site:
     companies: list[CompanyEntry] = field(default_factory=list)
     #: 절대주소용. 끝은 항상 '/'. 예: https://younghwan91.github.io/fin-checkup/
     base_url: str = "/"
+    #: 공유 카드 이미지가 이번 빌드에 생기는지 (`OG_IMAGE_PAGE` 가 등록돼 있으면 build 가 켠다).
+    og_images: bool = False
 
     def __post_init__(self) -> None:
         if not self.base_url.endswith("/"):
@@ -77,6 +95,22 @@ class Site:
 
     def absolute_url(self, path: str = "") -> str:
         return self.base_url + path.lstrip("/")
+
+    @property
+    def has_absolute_base(self) -> bool:
+        return self.base_url.startswith(("https://", "http://"))
+
+    def canonical_url(self, output_path: str) -> str | None:
+        """그 페이지의 절대주소. base_url 이 절대주소가 아니면 None (태그를 내지 않는다)."""
+        if not self.has_absolute_base:
+            return None
+        return self.absolute_url(page_url(output_path))
+
+    def og_image_url(self, stock_code: str) -> str | None:
+        """회사 공유 카드 이미지의 절대주소. 이미지가 안 생기는 빌드면 None."""
+        if not (self.og_images and self.has_absolute_base):
+            return None
+        return self.absolute_url(f"og/{stock_code}.png")
 
     def render(self, template: str, output_path: str, **context: Any) -> Output:
         """템플릿 하나를 출력 경로에 렌더한다. root·site 는 자동으로 들어간다."""
