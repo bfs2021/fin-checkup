@@ -8,7 +8,7 @@
     <li class="fc-metric sig-{{ m.signal.key }}" id="m-{{ m.key }}">
       <div class="fc-metric-head">
         <span class="fc-sig"><span aria-hidden="true">{{ m.signal.emoji }}</span> {{ m.signal.label }}</span>
-        <span class="fc-metric-label">{{ m.label }}</span>
+        <span class="fc-metric-label"><a href="{{ url('m/' ~ m.key ~ '/') }}" title="{{ m.label }} 해설">{{ m.label }}</a></span>
         <span class="fc-metric-value{% if m.missing %} muted{% endif %}">{{ m.value_text }}</span>
       </div>
       <p class="fc-desc">{{ m.description }}</p>
