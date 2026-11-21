@@ -5,6 +5,7 @@
     python -m fin_checkup.cli us AAPL         # 미국 건강검진 (SEC EDGAR)
     python -m fin_checkup.cli watch add 005930
     python -m fin_checkup.cli poll --dry-run  # 위험 공시 확인
+    python -m fin_checkup.cli site build      # 정적 사이트 (캐시만 읽음)
 """
 
 from __future__ import annotations
@@ -14,6 +15,7 @@ import asyncio
 import logging
 import sys
 from datetime import timedelta
+from pathlib import Path
 
 from fin_checkup.alerts.bot import TelegramBot
 from fin_checkup.alerts.classify import Severity
@@ -23,6 +25,7 @@ from fin_checkup.alerts.worker import AlertWorker
 from fin_checkup.auth import generate_key, normalize_email, user_id_for
 from fin_checkup.config import settings
 from fin_checkup.dart.client import DartError, RateLimitExceeded
+from fin_checkup.disclaimer import DISCLAIMER
 from fin_checkup.fiscal import default_fiscal_year
 from fin_checkup.format import format_metric
 from fin_checkup.metrics.engine import Category, checkup
@@ -32,11 +35,6 @@ from fin_checkup.sec.client import SecClient
 from fin_checkup.service import CheckupService
 from fin_checkup.storage import Cache, today_key
 from fin_checkup.storage.db import CacheLocked
-
-DISCLAIMER = (
-    "본 결과는 공시 수치를 공개된 재무비율 공식으로 계산한 측정값입니다. "
-    "투자권유·자문이 아니며, 데이터 정확성과 이용에 따른 손익에 책임지지 않습니다."
-)
 
 
 def _format(metric, currency: str = "KRW") -> str:
@@ -440,6 +438,37 @@ async def cmd_budget(args: argparse.Namespace) -> int:
     return 0
 
 
+async def cmd_site_build(args: argparse.Namespace) -> int:
+    """캐시만 읽어 정적 사이트를 만든다. DART 를 부르지 않는다."""
+    from fin_checkup.site.build import build_site
+
+    db_path = Path(settings.fin_checkup_db_path)
+    if not db_path.exists():
+        print(f"캐시 DB 가 없습니다: {db_path}  (FIN_CHECKUP_DB_PATH 로 지정할 수 있습니다)")
+        return 1
+
+    def progress(done: int, total: int) -> None:
+        if done % 200 == 0 or done == total:
+            print(f"  건강검진 {done:,}/{total:,}", flush=True)
+
+    out = Path(args.out)
+    with Cache(db_path, read_only=True) as cache:
+        try:
+            report = await build_site(
+                cache, out, args.year, limit=args.limit, base_url=args.base_url, progress=progress
+            )
+        except FileExistsError as exc:
+            print(str(exc))
+            return 1
+
+    print(
+        f"\n{out}/ — 회사 {report.companies:,}곳 · 파일 {report.files:,}개 · 건너뜀 {report.skipped:,}곳\n"
+        f"  계산 {report.load_seconds:.1f}초 · 렌더 {report.render_seconds:.1f}초 · "
+        f"회사당 {report.per_company_ms:.0f}ms"
+    )
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(message)s")
 
@@ -526,6 +555,18 @@ def main(argv: list[str] | None = None) -> int:
     p_serve.add_argument("--port", type=int, default=8000)
     p_serve.add_argument("--no-worker", action="store_true", help="알림 워커 없이 API만")
     p_serve.set_defaults(func=cmd_serve)
+
+    p_site = sub.add_parser("site", help="정적 사이트 (캐시만 읽음, DART 호출 없음)")
+    site_sub = p_site.add_subparsers(dest="site_action", required=True)
+    p_site_build = site_sub.add_parser("build", help="회사별 페이지를 출력 폴더에 생성")
+    p_site_build.add_argument("--year", type=int, default=default_fiscal_year(), help="기준 사업연도")
+    p_site_build.add_argument("--out", default="site-out", help="출력 폴더 (빌드마다 비운다)")
+    p_site_build.add_argument("--limit", type=int, default=None, help="앞에서 N곳만 (확인용)")
+    p_site_build.add_argument(
+        "--base-url", default="/",
+        help="절대주소가 필요한 곳(canonical·sitemap)에 쓸 사이트 주소. 링크는 상대경로라 무관",
+    )
+    p_site_build.set_defaults(func=cmd_site_build)
 
     args = parser.parse_args(argv)
     try:

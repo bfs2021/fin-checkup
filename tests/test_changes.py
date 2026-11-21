@@ -68,3 +68,16 @@ def test_threshold_is_configurable():
     prior = checkup(fin(2023, revenue=1000, operating_income=200))
     current = checkup(fin(2024, revenue=1000, operating_income=190))
     assert "operating_margin" in keys(detect_changes(current, prior, move_threshold=1.0))
+
+
+def test_not_applicable_metric_is_never_reported_as_a_change():
+    """⊘ 는 판정하지 않는다는 뜻이다. 급변 목록에 올리면 판정한 셈이 된다.
+
+    ⊘ 지표엔 경계값이 없어 "높을수록 좋다" 로 기본 처리된다. 은행 부채비율이 1,200% → 800% 로
+    줄면 "33% 나쁜 방향" 으로 잡혔다 — 예금이 부채로 잡히는 업종이라 방향 자체에 뜻이 없다.
+    """
+    from fin_checkup.metrics.sector import Sector
+
+    prior = checkup(fin(2023, total_liabilities=12000, total_equity=1000), sector=Sector.FINANCIAL)
+    current = checkup(fin(2024, total_liabilities=8000, total_equity=1000), sector=Sector.FINANCIAL)
+    assert "debt_ratio" not in keys(detect_changes(current, prior))

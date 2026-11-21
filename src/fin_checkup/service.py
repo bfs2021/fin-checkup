@@ -26,6 +26,7 @@ from fin_checkup.metrics.peers import (
 )
 from fin_checkup.metrics.redflags import RedFlag, detect_red_flags
 from fin_checkup.metrics.sector import Sector, peer_group_for, sector_for
+from fin_checkup.metrics.signals import Signal
 from fin_checkup.models import Company, CorpCode, Financials, FsDiv, ReportCode
 from fin_checkup.storage import Cache, today_key
 
@@ -221,6 +222,9 @@ class CheckupService:
         previous = {m.key: m.value for m in checkup(prior, sector=sector).metrics}
         deltas: dict[str, SelfDelta] = {}
         for metric in result.metrics:
+            # ⊘ 지표에 "개선/악화" 를 붙이면 판정하지 않겠다던 지표를 판정하게 된다.
+            if metric.signal is Signal.NOT_APPLICABLE:
+                continue
             delta = self_delta(metric, previous.get(metric.key), currency=result.currency)
             if delta is not None:
                 deltas[metric.key] = delta
