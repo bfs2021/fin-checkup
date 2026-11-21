@@ -199,14 +199,14 @@ def test_browser_add_on_company_page_then_watch_page_shows_it(out):
         item = page.locator('.fc-watch-item[data-code="005930"]')
         item.wait_for()
         assert "삼성전자" in item.text_content() and "2024년 사업보고서 기준" in item.text_content()
-        assert item.locator("a").get_attribute("href").endswith("c/005930/")
+        assert item.locator(".fc-watch-name").get_attribute("href").endswith("c/005930/")
 
         # 가져오기 → 이름순 목록, 기준이 없던 항목은 지금 상태로 채워진다.
         page.fill(".fc-watch-import", "105560\n999999")
         page.click(".fc-watch-import-button")
         page.locator('.fc-watch-item[data-code="105560"]').wait_for()
         page.locator('.fc-watch-item[data-code="999999"]', has_text="이번 빌드에는").wait_for()
-        names = page.locator(".fc-watch-head a").all_text_contents()
+        names = page.locator(".fc-watch-name").all_text_contents()
         assert names == ["999999", "KB금융", "삼성전자"], "이름(없으면 코드) 코드포인트 순"
         assert "105560 KB금융" in page.input_value(".fc-watch-export")
 

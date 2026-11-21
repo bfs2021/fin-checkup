@@ -136,6 +136,7 @@ async def build_site(
     images: bool = True,
     image_workers: int = 1,
     fonts: FontSet | None = None,
+    disclosures: dict | None = None,
 ) -> BuildReport:
     """images=False 거나 한국어 글꼴이 없으면 PNG 페이지(`OG_IMAGE_PAGE`)를 이번 빌드에서 뺀다 — 두부(□)
     그림을 내느니 없는 편이 낫고, 그림이 없으면 og:image 도 내지 않는다."""
@@ -158,6 +159,7 @@ async def build_site(
         og_images=OG_IMAGE_PAGE in pages,
         fonts=image_fonts,
         image_workers=image_workers,
+        disclosures=disclosures,
     )
     _prepare_out(out)
     files = 0

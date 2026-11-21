@@ -492,6 +492,15 @@ async def cmd_site_build(args: argparse.Namespace) -> int:
         if done % 200 == 0 or done == total:
             print(f"  건강검진 {done:,}/{total:,}", flush=True)
 
+    disclosures = None
+    if args.disclosures:
+        from fin_checkup.disclosures import read_json
+
+        try:
+            disclosures = read_json(args.disclosures)
+        except (OSError, ValueError) as exc:
+            print(f"공시 JSON 을 읽지 못했습니다 — 공시 없이 만듭니다: {exc}")
+
     out = Path(args.out)
     with Cache(db_path, read_only=True) as cache:
         try:
@@ -504,6 +513,7 @@ async def cmd_site_build(args: argparse.Namespace) -> int:
                 progress=progress,
                 images=args.images,
                 image_workers=args.image_workers,
+                disclosures=disclosures,
             )
         except FileExistsError as exc:
             print(str(exc))
@@ -662,6 +672,10 @@ def main(argv: list[str] | None = None) -> int:
         type=int,
         default=os.cpu_count() or 1,
         help="PNG 를 나눠 그릴 프로세스 수 (기본: CPU 수)",
+    )
+    p_site_build.add_argument(
+        "--disclosures", default=None,
+        help="`disclosures fetch` 가 쓴 JSON — 회사별·시장 전체 Atom 피드에 위험 공시를 싣는다 (없으면 생략)",
     )
     p_site_build.set_defaults(func=cmd_site_build)
     p_site_check = site_sub.add_parser(
