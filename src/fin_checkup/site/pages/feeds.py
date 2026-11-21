@@ -29,6 +29,7 @@ from fin_checkup.metrics.signals import Signal
 from fin_checkup.models import Financials, FsDiv
 from fin_checkup.presentation import summary_chips
 from fin_checkup.site.context import CompanyEntry, Site, root_for
+from fin_checkup.site.disclosures import DisclosureItem
 from fin_checkup.site.registry import Output, page
 from fin_checkup.site.season import filings_of
 
@@ -36,9 +37,6 @@ ATOM = "http://www.w3.org/2005/Atom"
 ET.register_namespace("", ATOM)
 
 MARKET_FEED = "feeds/disclosures.xml"
-#: 시장 전체 피드에 싣는 공시 강도 (`alerts.classify.Severity`).
-MARKET_SEVERITY = "critical"
-DART_URL = re.compile(r"^https://dart\.fss\.or\.kr/")
 #: XML 1.0 에 들어갈 수 없는 제어 문자. 공시 제목에 섞여 오면 피드 전체가 깨진다.
 _XML_INVALID = re.compile("[\x00-\x08\x0b\x0c\x0e-\x1f￾￿]")
 SOURCE = "출처: 금융감독원 전자공시시스템(DART)."
@@ -79,13 +77,6 @@ def _href(site: Site, feed_path: str, target: str) -> str:
     if site.has_absolute_base:
         return site.absolute_url(target)
     return root_for(feed_path) + target
-
-
-def _dart_day(rcept_dt: str) -> date | None:
-    try:
-        return date(int(rcept_dt[:4]), int(rcept_dt[4:6]), int(rcept_dt[6:8]))
-    except (TypeError, ValueError):
-        return None
 
 
 # ── 회사 ──────────────────────────────────────────────────────────
@@ -158,30 +149,21 @@ def company_entries(entry: CompanyEntry, site: Site) -> list[FeedEntry]:
                     "비교할 해가 없거나 계정을 못 찾은 것이라 뺐습니다.",
                 )
             )
-    entries += [e for d in _company_disclosures(site, code) if (e := _disclosure_entry(d))]
+    entries += [_disclosure_entry(d) for d in _company_disclosures(site, code)]
     return entries
 
 
-def _company_disclosures(site: Site, code: str) -> list[dict]:
-    if not site.disclosures:
-        return []
-    return [d for d in site.disclosures["items"] if isinstance(d, dict) and d.get("stock_code") == code]
+def _company_disclosures(site: Site, code: str) -> list[DisclosureItem]:
+    return site.disclosures.for_company(code) if site.disclosures else []
 
 
-def _disclosure_entry(d: dict, with_company: bool = False) -> FeedEntry | None:
-    day = _dart_day(str(d.get("rcept_dt", "")))
-    rcept_no = str(d.get("rcept_no", ""))
-    if day is None or not rcept_no.isdigit():
-        return None
-    url = str(d.get("url", ""))
-    url = url if DART_URL.match(url) else None
-    category = str(d.get("category_label", ""))
-    title = str(d.get("report_nm", ""))
-    corp = str(d.get("corp_name", ""))
+def _disclosure_entry(d: DisclosureItem, with_company: bool = False) -> FeedEntry:
+    # 항목 검증(접수번호·접수일·유형)과 DART 원문 주소는 site/disclosures.py 가 이미 했다.
+    day, url, category, title, corp = d.rcept_dt, d.url, d.label, d.report_nm, d.corp_name
     heading = f"[{category}] {corp} — {title}" if with_company else f"[{category}] {title}"
-    correction = " (정정 공시)" if d.get("is_correction") else ""
+    correction = " (정정 공시)" if d.is_correction else ""
     return FeedEntry(
-        name=f"dart/{rcept_no}",
+        name=f"dart/{d.rcept_no}",
         title=heading,
         updated=day,
         link=url,
@@ -253,12 +235,12 @@ def company_feed(entry: CompanyEntry, site: Site) -> str:
 
 
 def market_feed(site: Site) -> str:
-    items = site.disclosures["items"] if site.disclosures else []
-    picked = [d for d in items if isinstance(d, dict) and d.get("severity") == MARKET_SEVERITY]
-    entries = [e for d in picked if (e := _disclosure_entry(d, with_company=True))]
+    # 알림 채널·첫 화면과 같은 기준(is_market_wide)과 같은 사건 묶기 — DisclosureFeed.market_wide.
+    feed = site.disclosures
+    entries = [_disclosure_entry(d, with_company=True) for d in feed.market_wide()] if feed else []
     period = ""
-    if site.disclosures:
-        period = f" 수집 기간 {site.disclosures.get('bgn_de', '')}~{site.disclosures.get('end_de', '')}."
+    if feed:
+        period = f" 수집 기간 {feed.begin:%Y%m%d}~{feed.end:%Y%m%d}."
     return atom_feed(
         name="feeds/disclosures",
         title="상장사 위험 공시(심각) · fin-checkup",

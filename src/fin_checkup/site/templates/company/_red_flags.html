@@ -9,5 +9,5 @@
   {% else %}
   <p>재무제표에서 확인되는 위험 신호는 없습니다.</p>
   {% endif %}
-  <p class="fc-hint">감사의견·유상증자·CB/BW·최대주주 지분 변화는 공시 데이터가 필요해 여기서는 보지 않습니다.</p>
+  <p class="fc-hint">감사의견·유상증자·CB/BW·최대주주 지분 변화는 공시 데이터가 필요해 여기서는 보지 않습니다.{% if recent_disclosures %} 최근 공시는 <a href="#disclosures">최근 위험 공시</a>에 있습니다.{% endif %}</p>
 </section>

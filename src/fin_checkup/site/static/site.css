@@ -230,6 +230,17 @@ h3 { font-size: .9rem; color: var(--ink-muted); margin: 1.2rem 0 .5rem; letter-s
   border-left: 4px solid var(--sig, var(--border)); padding: .2rem .7rem;
 }
 .fc-changes li { --sig: var(--sig-yellow); }
+/* 최근 위험 공시 (_disclosure_list.html) — 사실 목록. 신호색·긴급 표시 없이 회색 줄만. */
+.fc-disclosures { padding-left: 0; list-style: none; margin: 0; display: grid; gap: .45rem; }
+.fc-disclosures li {
+  border-left: 3px solid var(--border); padding: .1rem .7rem;
+  display: flex; flex-wrap: wrap; gap: .1rem .6rem; align-items: baseline;
+}
+.fc-disclosures time { color: var(--ink-muted); font-size: .85rem; font-variant-numeric: tabular-nums; }
+.fc-disclosure-corp { font-weight: 600; }
+.fc-disclosure-kind { font-size: .82rem; }
+.fc-disclosure-title { flex: 1 1 14rem; }
+.fc-disclosure-src { font-size: .85rem; white-space: nowrap; }
 .fc-footnote { font-size: .82rem; color: var(--ink-muted); }
 
 /* ── 차트 (site/charts.py 인라인 SVG) ─────────────────── */
