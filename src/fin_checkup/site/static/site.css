@@ -360,3 +360,6 @@ h3 { font-size: .9rem; color: var(--ink-muted); margin: 1.2rem 0 .5rem; letter-s
 .fc-watch-head a { font-weight: 600; }
 .fc-watch-remove { margin-left: auto; font-size: .8rem; padding: .15rem .6rem; }
 .fc-watch textarea { display: block; width: 100%; font: inherit; font-size: .9rem; margin: .2rem 0 .6rem; }
+.fc-watch-changes { margin-top: .5rem; padding-top: .5rem; border-top: 1px dashed var(--border); font-size: .9rem; }
+.fc-watch-since { margin: 0 0 .2rem; color: var(--ink-muted); }
+.fc-watch-change-list { margin: .2rem 0 .5rem; padding-left: 1.1rem; }
