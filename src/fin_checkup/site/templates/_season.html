@@ -1,10 +1,10 @@
 {#
   데이터 기준일 · 정기 공시 시즌 안내 (랜딩·회사 페이지). 값은 site.season (season.py) — 빌드 날짜 기준.
   카운트다운·남은 일수·재촉하는 문구를 넣지 않는다.
+  season_compact: 첫 화면용 — 기준일 한 줄만 보이고 나머지는 한 번 눌러 펼친다(휴대폰 첫 화면을 차지하지 않게).
 #}
 {% set s = site.season %}
-<aside class="fc-season" aria-labelledby="season-title">
-  <h2 id="season-title">데이터 기준일</h2>
+{% macro season_body() %}
   <p>여기 숫자는 <b>{{ s.year }} 사업연도</b> 사업보고서 기준이에요. 사이트를 마지막으로 만든 날은 {{ s.built_on.isoformat() }}입니다.</p>
   {% if s.pending_year %}
   <p>{{ s.pending_year }} 사업연도 사업보고서는 제출 기한({{ s.pending_due.isoformat() }})이 지났지만 이 사이트에는 아직 반영되지 않았습니다.</p>
@@ -16,4 +16,17 @@
     {% endfor %}
   </ul>
   <p class="fc-hint">사업보고서는 사업연도가 끝나고 90일, 분기·반기보고서는 45일 안에 냅니다(자본시장법 제159·160조). 기한이 주말·공휴일이면 다음 날로 늘어나고, 결산월이 다른 회사는 날짜도 다릅니다. 신호등은 사업보고서(연간) 숫자로만 계산합니다.</p>
+{% endmacro %}
+{% if season_compact is defined and season_compact %}
+<aside class="fc-season fc-season-compact" aria-label="데이터 기준일">
+  <details>
+    <summary>데이터 기준: {{ s.year }} 사업연도 사업보고서 · 상장사 {{ "{:,}".format(site.companies | length) }}곳 · 빌드 {{ s.built_on.isoformat() }}{% if s.pending_year %} <span class="fc-season-pending">({{ s.pending_year }} 사업연도는 아직 반영 전)</span>{% endif %} <span class="fc-season-more">새 숫자는 언제?</span></summary>
+    {{ season_body() }}
+  </details>
 </aside>
+{% else %}
+<aside class="fc-season" aria-labelledby="season-title">
+  <h2 id="season-title">데이터 기준일</h2>
+  {{ season_body() }}
+</aside>
+{% endif %}

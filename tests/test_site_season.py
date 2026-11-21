@@ -68,7 +68,7 @@ async def out(tmp_path):
 
 
 def section(text: str) -> str:
-    m = re.search(r'<aside class="fc-season".*?</aside>', text, re.S)
+    m = re.search(r'<aside class="fc-season[^"]*".*?</aside>', text, re.S)
     assert m, "시즌 안내가 없다"
     return m.group(0)
 
