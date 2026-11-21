@@ -1,0 +1,52 @@
+name: 데이터가 이상해요
+description: 어떤 회사의 지표·신호가 DART 원문과 맞지 않는다
+title: "[데이터] "
+labels: ["데이터 정확성"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        숫자가 DART 원문과 다르면 대부분 계정 이름이 회사마다 달라 정규화가 놓친 경우입니다. 아래를 채워 주시면 바로 재현할 수 있습니다.
+        신호 색이 마음에 들지 않는다는 이유만으로 경계값을 바꾸지는 않습니다 — 경계값은 실제 시장 분포로 맞춘 값입니다.
+  - type: input
+    id: code
+    attributes:
+      label: 종목코드 (또는 미국 티커)
+      placeholder: "005930"
+    validations:
+      required: true
+  - type: input
+    id: year
+    attributes:
+      label: 사업연도
+      placeholder: "2024"
+    validations:
+      required: true
+  - type: input
+    id: metric
+    attributes:
+      label: 지표
+      description: 화면에 보이는 이름 그대로
+      placeholder: 부채비율
+    validations:
+      required: true
+  - type: textarea
+    id: seen
+    attributes:
+      label: 화면에 나온 값·신호 → 원문 기준으로 맞다고 보는 값
+      placeholder: "화면: 🔴 412% / 원문: 부채총계 ○○, 자본총계 ○○ → 약 210%"
+    validations:
+      required: true
+  - type: input
+    id: dart
+    attributes:
+      label: DART 원문 링크
+      description: dart.fss.or.kr 의 사업보고서 주소 (재무제표 쪽이면 더 좋습니다)
+      placeholder: https://dart.fss.or.kr/dsaf001/main.do?rcpNo=...
+    validations:
+      required: true
+  - type: textarea
+    id: more
+    attributes:
+      label: 더 알려 줄 것
+      description: 연결/별도 중 어느 쪽인지, 원문에서 쓰인 계정 이름 등

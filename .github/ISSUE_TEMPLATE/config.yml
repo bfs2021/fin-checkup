@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 지켜야 하는 선 (docs/REGULATORY.md)
+    url: https://github.com/younghwan91/fin-checkup/blob/main/docs/REGULATORY.md
+    about: 종목 추천·매매 판단·순위표는 요청해도 넣지 않습니다. 이슈를 쓰기 전에 한 번 읽어 주세요.
+  - name: 기여 안내 (CONTRIBUTING.md)
+    url: https://github.com/younghwan91/fin-checkup/blob/main/CONTRIBUTING.md
+    about: 개발 환경·테스트·해설을 어디에 더하는지.
