@@ -60,3 +60,5 @@ ignore = ["UP042"]
 [tool.ruff.lint.per-file-ignores]
 # Depends()·Query()를 기본값에 두는 건 FastAPI의 표준 관용구다.
 "src/fin_checkup/api/*.py" = ["B008"]
+# 해설 모듈은 문장이 데이터다. 한 문장을 여러 줄 문자열로 쪼개면 읽고 고치기 어렵다.
+"src/fin_checkup/explain/*.py" = ["E501"]
