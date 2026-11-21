@@ -282,8 +282,12 @@ h3 { font-size: .9rem; color: var(--ink-muted); margin: 1.2rem 0 .5rem; letter-s
 .fc-ch-edge { stroke: var(--ink-muted); stroke-width: 1; }
 
 .fc-peer { margin: .6rem 0 0; }
-.fc-peer figcaption, .fc-peer-key { font-size: .78rem; color: var(--ink-muted); }
-.fc-peer figcaption b { color: var(--ink); font-weight: 600; }
+.fc-peer figure { margin: .3rem 0 0; }
+.fc-peer summary, .fc-peer-key { font-size: .78rem; color: var(--ink-muted); }
+.fc-peer summary { cursor: pointer; }
+.fc-peer summary b { color: var(--ink); font-weight: 600; }
+.fc-peer-more { color: var(--link); text-decoration: underline; white-space: nowrap; }
+.fc-peer[open] .fc-peer-more { display: none; }
 .fc-peer-key { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: .15rem .7rem; }
 .fc-peer-key > span { white-space: nowrap; display: inline-flex; align-items: center; gap: .3rem; }
 .fc-key { display: inline-block; width: 12px; height: 10px; }
