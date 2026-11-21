@@ -1,0 +1,31 @@
+name: 해설 개선
+description: 지표·용어·위험 신호·업종 설명이 어렵거나, 틀렸거나, 평가처럼 읽힌다
+labels: ["해설"]
+body:
+  - type: input
+    id: where
+    attributes:
+      label: 어느 설명
+      description: 페이지 주소나 파일·항목 (예 /m/debt_ratio/ · explain/glossary.py 의 equity)
+    validations:
+      required: true
+  - type: textarea
+    id: now
+    attributes:
+      label: 지금 문장
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 바꿀 문장과 이유
+      description: 사실을 말하는 문장으로. 근거가 되는 자료(법령·회계기준·거래소 안내)가 있으면 링크를 붙여 주세요.
+    validations:
+      required: true
+  - type: checkboxes
+    id: lines
+    attributes:
+      label: 확인
+      options:
+        - label: 제안 문장에 추천·매수/매도·유망·저평가 같은 판단 표현이 없다
+          required: true

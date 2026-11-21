@@ -1,0 +1,27 @@
+name: 기능 제안
+description: 새 기능이나 화면
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        받지 않는 제안: 종목 추천·매매 신호·종합 점수/등급·지표 순위표("상위 N")·결제/구독 기능.
+        이 도구는 측정값과 그 계산식을 보여 주는 데까지입니다 (docs/REGULATORY.md).
+  - type: textarea
+    id: problem
+    attributes:
+      label: 어떤 불편을 푸나
+      description: 지금 무엇을 하려다 막히는지
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: 생각한 방법
+  - type: checkboxes
+    id: lines
+    attributes:
+      label: 확인
+      options:
+        - label: 이 기능은 투자 판단을 대신하지 않고, 계산식·경계값을 감추지 않는다
+          required: true
