@@ -344,3 +344,14 @@ h3 { font-size: .9rem; color: var(--ink-muted); margin: 1.2rem 0 .5rem; letter-s
 .fc-share { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; }
 .fc-share-field { font: inherit; font-size: .85rem; min-width: 16rem; max-width: 100%; padding: .3rem .5rem; }
 .fc-share-status { font-size: .85rem; color: var(--ink-muted); }
+
+/* ── 관심종목 (watch/index.html · _watch_toggle.html) ─────── */
+
+.fc-nav a { color: var(--ink); font-size: .9rem; }
+.fc-watch-status { font-size: .85rem; color: var(--ink-muted); }
+.fc-watch-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .7rem; }
+.fc-watch-item { border: 1px solid var(--border); border-radius: 8px; padding: .7rem .8rem; background: var(--surface); }
+.fc-watch-head { display: flex; flex-wrap: wrap; gap: .5rem; align-items: baseline; }
+.fc-watch-head a { font-weight: 600; }
+.fc-watch-remove { margin-left: auto; font-size: .8rem; padding: .15rem .6rem; }
+.fc-watch textarea { display: block; width: 100%; font: inherit; font-size: .9rem; margin: .2rem 0 .6rem; }
