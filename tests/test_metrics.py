@@ -166,6 +166,18 @@ def test_turnaround_to_profit_is_green():
     assert "흑자로 돌아섰다" in metric.note
 
 
+def test_turn_from_profit_to_loss_is_labelled():
+    """전년 흑자 → 올해 적자. 증가율(−150%)은 그대로 두고 적자 전환을 비고로 밝힌다.
+
+    2024 상장사 영업이익 203곳 · 순이익 250곳이 여기 해당하는데 숫자만 나갔다.
+    """
+    result = checkup(fin(operating_income=-50), prior=fin(bsns_year=2023, operating_income=100))
+    metric = get(result, "operating_income_growth")
+    assert metric.value == pytest.approx(-150.0)
+    assert metric.signal is Signal.RED
+    assert "흑자에서 적자로 돌아섰다" in metric.note
+
+
 def test_widening_loss_is_distinguished_from_narrowing_loss():
     narrowing = get(
         checkup(fin(net_income=-50), prior=fin(bsns_year=2023, net_income=-100)),
