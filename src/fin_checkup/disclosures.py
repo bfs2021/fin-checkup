@@ -103,3 +103,13 @@ def write_json(payload: dict, path: Path | str) -> None:
     tmp = path.with_name(path.name + ".tmp")
     tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     os.replace(tmp, path)
+
+
+def read_json(path: Path | str) -> dict:
+    """`write_json` 이 쓴 파일을 읽는다. 형식 버전이 다르면 ValueError — 필드 뜻이 달라졌을 수 있다."""
+    payload = json.loads(Path(path).read_text(encoding="utf-8"))
+    if not isinstance(payload, dict) or payload.get("format_version") != FORMAT_VERSION:
+        raise ValueError(f"{path}: 공시 JSON 형식 버전이 {FORMAT_VERSION} 이 아니다")
+    if not isinstance(payload.get("items"), list):
+        raise ValueError(f"{path}: items 가 없다")
+    return payload

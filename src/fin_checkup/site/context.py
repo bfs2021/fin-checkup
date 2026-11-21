@@ -95,6 +95,9 @@ class Site:
     fonts: Any = None
     #: PNG 를 나눠 그릴 프로세스 수.
     image_workers: int = 1
+    #: `cli disclosures fetch` 가 쓴 최근 위험 공시 JSON (`disclosures.read_json`). 없으면 None —
+    #: 공시를 쓰는 페이지(피드 등)는 공시 없이 만든다.
+    disclosures: dict | None = None
 
     def __post_init__(self) -> None:
         if not self.base_url.endswith("/"):

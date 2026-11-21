@@ -398,10 +398,14 @@
     var li = el("li", "fc-watch-item");
     li.setAttribute("data-code", item.code);
     var head = el("div", "fc-watch-head");
-    var a = el("a", null, company ? company.company.name : item.name);
+    var a = el("a", "fc-watch-name", company ? company.company.name : item.name);
     a.href = root + "c/" + item.code + "/";
     head.appendChild(a);
     head.appendChild(el("span", "fc-code", item.code));
+    var feed = el("a", "fc-feed-link", "피드");
+    feed.href = root + "feeds/c/" + item.code + ".xml";
+    feed.setAttribute("aria-label", (company ? company.company.name : item.name) + " Atom 피드");
+    head.appendChild(feed);
     var drop = el("button", "fc-button fc-watch-remove", "빼기");
     drop.type = "button";
     drop.setAttribute("aria-label", (company ? company.company.name : item.name) + " 관심종목에서 빼기");

@@ -127,6 +127,8 @@ jobs:
         run: |
           args=(--out site-out --base-url "$SITE_URL")
           if [ -n "$YEAR" ]; then args+=(--year "$YEAR"); fi
+          # 공시가 있으면 회사별·시장 전체 Atom 피드에 싣는다 (feeds/).
+          if [ -f _site-data/disclosures.json ]; then args+=(--disclosures _site-data/disclosures.json); fi
           uv run python -m fin_checkup.cli site build "${args[@]}"
           # 사이트 빌더가 공시를 읽게 되기 전까지(D3) 원자료를 정적 JSON 으로 함께 싣는다.
           if [ -f _site-data/disclosures.json ]; then
