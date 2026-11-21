@@ -13,7 +13,7 @@
     <p class="fc-basis">{{ site.year }} 사업연도 · {{ sectors | map(attribute="label") | join("·") }} 기준으로 판정</p>
     {% if group.info.mixed_note %}<p class="fc-notice">{{ group.info.mixed_note }}</p>{% endif %}
     {% if group.count < min_peers %}
-    <p class="fc-notice">회사가 {{ group.count }}곳뿐이라 업종 분포를 내지 않습니다. 회사 페이지는 이런 업종의 지표를 전체 상장사와 견줍니다.</p>
+    <p class="fc-notice">회사가 {{ group.count }}곳뿐이라 업종 분포를 내지 않습니다. 회사 페이지는 이런 업종의 지표를 전체 상장사와 견줍니다 — <a href="{{ url('market/') }}">시장 전체 분포</a>.</p>
     {% endif %}
   </header>
 

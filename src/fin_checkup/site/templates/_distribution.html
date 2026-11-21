@@ -9,7 +9,7 @@
   <li class="fc-metric" id="d-{{ d.key }}">
     <div class="fc-metric-head">
       <a class="fc-metric-label" href="{{ url(b.explainer_path) }}">{{ d.spec.label }}</a>
-      <span class="fc-dist-count">{{ d.count }}곳</span>
+      <span class="fc-dist-count">{{ "{:,}".format(d.count) }}곳</span>
     </div>
     {% if d.enough %}
     <dl class="fc-dist-stats">
@@ -23,7 +23,7 @@
     {% if show_signals %}
     <ul class="fc-shares" aria-label="{{ d.spec.label }} 신호 비율">
       {% for s in d.signals %}
-      <li class="sig-{{ s.signal.value }}"><span aria-hidden="true">{{ s.signal.emoji }}</span> {{ s.signal.label }} {{ s.percent }}% <small>({{ s.count }}곳)</small></li>
+      <li class="sig-{{ s.signal.value }}"><span aria-hidden="true">{{ s.signal.emoji }}</span> {{ s.signal.label }} {{ s.percent }}% <small>({{ "{:,}".format(s.count) }}곳)</small></li>
       {% endfor %}
     </ul>
     {% endif %}
@@ -34,7 +34,7 @@
       {% endfor %}
     </dl>
     {% if d.excluded_text %}
-    <p class="fc-note">분포에서 뺀 회사: {{ d.excluded_text }} (전체 {{ d.total }}곳). 없는 값을 0으로 세지 않습니다.</p>
+    <p class="fc-note">분포에서 뺀 회사: {{ d.excluded_text }} (전체 {{ "{:,}".format(d.total) }}곳). 없는 값을 0으로 세지 않습니다.</p>
     {% endif %}
   </li>
   {% endfor %}

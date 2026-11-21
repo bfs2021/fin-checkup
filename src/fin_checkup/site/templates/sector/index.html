@@ -11,6 +11,7 @@
     <li><a href="{{ url(g.path) }}"><span class="fc-code">{{ g.info.code }}</span> {{ g.info.name }}</a> <small>{{ g.count }}곳</small></li>
     {% endfor %}
   </ul>
+  <p>업종을 가리지 않은 분포는 <a href="{{ url('market/') }}">시장 전체 분포</a>에 있습니다.</p>
   {% if ungrouped %}
   <p class="fc-hint">업종코드가 없는 회사 {{ ungrouped }}곳은 어느 업종에도 넣지 않았습니다.</p>
   {% endif %}
