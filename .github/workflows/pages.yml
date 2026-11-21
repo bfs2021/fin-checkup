@@ -127,6 +127,17 @@ jobs:
           fi
           fc-list :lang=ko family | sort -u | head -5
 
+      # 증분 빌드 캐시(site/incremental.py) — 코드·데이터가 같으면 건강검진과 공유 카드 PNG 를 다시 만들지 않는다.
+      # 열쇠에 run_id 를 넣어 매번 새로 저장하고, 가장 최근 것을 이어 쓴다. 이 워크플로는 PR 로 돌지 않아
+      # 포크가 만든 캐시를 읽지 않는다(캐시는 pickle 이라 남이 만든 것을 읽으면 안 된다).
+      - name: 증분 빌드 캐시
+        if: steps.snapshot.outputs.found == 'true'
+        uses: actions/cache@v6
+        with:
+          path: _build-cache
+          key: site-build-${{ github.run_id }}
+          restore-keys: site-build-
+
       - name: 사이트 빌드
         if: steps.snapshot.outputs.found == 'true'
         env:
@@ -134,7 +145,9 @@ jobs:
           DISCLOSURES_OK: ${{ steps.disclosures.outcome == 'success' }}
         run: |
           # --snapshot: 꼬리의 데이터 기준 줄과 /build.json 에 스냅샷 manifest 날짜를 적는다.
-          args=(--out site-out --base-url "$SITE_URL" --snapshot _snapshot/files)
+          # --jobs: 러너 CPU 수만큼 건강검진을 나눠 계산한다 (로컬 16코어 실측: 45초 → 12초 안팎).
+          args=(--out site-out --base-url "$SITE_URL" --snapshot _snapshot/files
+                --jobs "$(nproc)" --incremental _build-cache)
           if [ -n "$YEAR" ]; then args+=(--year "$YEAR"); fi
           # 공시 단계가 성공해 파일을 남겼을 때만 넘긴다. 빌더가 회사 페이지·첫 화면 공시 섹션,
           # 회사별·시장 전체 Atom 피드(feeds/)의 공시 항목, /data/disclosures.json 을 만든다.

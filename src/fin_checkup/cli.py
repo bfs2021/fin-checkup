@@ -532,6 +532,8 @@ async def cmd_site_build(args: argparse.Namespace) -> int:
                 image_workers=args.image_workers,
                 disclosures=feed,
                 snapshot=snapshot,
+                jobs=args.jobs,
+                incremental_dir=Path(args.incremental) if args.incremental else None,
             )
         except FileExistsError as exc:
             print(str(exc))
@@ -549,6 +551,8 @@ async def cmd_site_build(args: argparse.Namespace) -> int:
             f"  공유 카드 PNG {n:,}장 · {seconds:.1f}초 · 장당 {per:.0f}ms "
             f"(프로세스 최대 {args.image_workers}개)"
         )
+    if report.cache_summary:
+        print(f"  {report.cache_summary}")
     # GitHub Actions 에선 워크플로 요약에 경고 주석으로 뜬다.
     prefix = "::warning::" if os.environ.get("GITHUB_ACTIONS") else "경고: "
     for warning in [report.image_warning, *report.warnings]:
@@ -765,6 +769,14 @@ def main(argv: list[str] | None = None) -> int:
     p_site_build.add_argument(
         "--snapshot", default=None,
         help="`snapshot import` 한 폴더(manifest.json). 주면 꼬리·build.json 에 스냅샷 날짜를 적는다",
+    )
+    p_site_build.add_argument(
+        "--jobs", type=int, default=1,
+        help="건강검진 계산을 나눌 프로세스 수 (DB 를 읽기 전용으로 여는 site build 에서만)",
+    )
+    p_site_build.add_argument(
+        "--incremental", default=None, metavar="DIR",
+        help="증분 빌드 캐시 폴더 — 코드·데이터가 같은 건강검진과 공유 카드 PNG 를 다시 만들지 않는다",
     )
     p_site_build.set_defaults(func=cmd_site_build)
 
