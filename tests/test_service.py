@@ -118,6 +118,41 @@ async def test_run_builds_checkup_with_growth_from_history(service, cache):
     assert growth is not None and growth.value == pytest.approx(20.0)
 
 
+async def test_growth_and_deltas_use_this_years_prior_column_not_last_years_report(service, cache):
+    """작년 보고서(개별)와 올해 보고서(연결)를 견주면 연결 범위가 다른 숫자끼리다.
+
+    2024 상장사 2,404곳 중 83곳이 두 해의 연결/개별이 갈렸고, 같은 기준이어도 재작성으로
+    전기 매출이 10% 넘게 달라진 곳이 57곳이었다. 올해 보고서의 전기 열은 올해와 같은 기준이다.
+    """
+    cache.save_statements(statements(2023, 500.0, fs_div=FsDiv.OFS))
+    current = statements(2024, 1200.0)
+    for ln in current.lines:
+        ln.frmtrm_amount = 1000.0 if ln.account_id == "ifrs-full_Revenue" else ln.thstrm_amount
+    cache.save_statements(current)
+    with respx.mock:
+        result = await service.run(SAMSUNG, end_year=2024, years=3, allow_fetch=False)
+    assert result is not None
+    growth = result.result.by_key("revenue_growth")
+    assert growth is not None and growth.value == pytest.approx(20.0)
+    # 작년 영업이익률도 같은 전기 열로: 전기 영업이익 120 ÷ 전기 매출 1,000 (작년 개별 보고서는 10%).
+    assert result.deltas["operating_margin"].previous == pytest.approx(12.0)
+
+
+async def test_backfill_growth_needs_no_previous_report_when_the_prior_column_exists(service, cache):
+    """2023 사업연도는 2022 보고서를 아직 안 모았어도 2023 보고서의 전기 열로 성장성을 낸다."""
+    cache.save_company(_company("00126380"))
+    current = statements(2024, 1200.0)
+    for ln in current.lines:
+        ln.frmtrm_amount = 1000.0 if ln.account_id == "ifrs-full_Revenue" else ln.thstrm_amount
+    cache.save_statements(current)
+    service.backfill_metric_values(2024)
+    value = cache.conn.execute(
+        "SELECT value FROM metric_values WHERE corp_code = ? AND bsns_year = 2024"
+        " AND metric_key = 'revenue_growth'", ["00126380"],
+    ).fetchone()
+    assert value is not None and value[0] == pytest.approx(20.0)
+
+
 async def test_run_returns_none_when_no_data_at_all(service):
     with respx.mock:
         assert await service.run(SAMSUNG, end_year=2024, allow_fetch=False) is None

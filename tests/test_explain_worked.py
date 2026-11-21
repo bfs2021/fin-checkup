@@ -65,6 +65,17 @@ def test_growth_uses_this_year_and_last_year():
     assert example.result_text == f"{metric.value:,.2f}%"
 
 
+def test_growth_example_uses_the_same_prior_year_as_the_engine():
+    """엔진이 올해 보고서의 전기 열로 계산했으면 예시도 그 숫자다 — 작년 보고서 숫자면 답이 어긋난다."""
+    restated = fin(2023, revenue=2_000_000e8)
+    latest = HISTORY[1].model_copy(update={"comparative": restated})
+    history = [HISTORY[0], latest]
+    metric = checkup(latest, HISTORY[0]).by_key("revenue_growth")
+    example = worked_example(metric, history)
+    assert example.inputs[1].value == 2_000_000e8
+    assert recompute(example) == pytest.approx(metric.value)
+
+
 def test_inputs_name_the_statement_they_come_from():
     metric = checkup(HISTORY[1], HISTORY[0]).by_key("interest_coverage")
     example = worked_example(metric, HISTORY)

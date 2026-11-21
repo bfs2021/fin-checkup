@@ -425,8 +425,23 @@ def _currency_of(lines: Iterable[AccountLine]) -> str:
     return counts.most_common(1)[0][0] if counts else "KRW"
 
 
+def _prior_column(raw: RawStatements) -> RawStatements | None:
+    """같은 보고서의 전기 열(frmtrm)을 당기 자리에 놓은 작년 보고서. 전기 열이 비었으면 None."""
+    if all(ln.frmtrm_amount is None for ln in raw.lines):
+        return None
+    lines = [ln.model_copy(update={"thstrm_amount": ln.frmtrm_amount}) for ln in raw.lines]
+    return raw.model_copy(update={"bsns_year": raw.bsns_year - 1, "lines": lines})
+
+
 def normalize_statements(raw: RawStatements) -> Financials:
-    """원본 계정 줄 → 지표 계산용 Financials."""
+    """원본 계정 줄 → 지표 계산용 Financials. 전기 열이 있으면 `comparative` 로 함께 낸다."""
+    prior = _prior_column(raw)
+    return _normalize(raw).model_copy(
+        update={"comparative": _normalize(prior) if prior is not None else None}
+    )
+
+
+def _normalize(raw: RawStatements) -> Financials:
     values = {spec.name: _find(raw.lines, spec) for spec in FIELD_SPECS}
     values["revenue"] = _revenue(raw.lines)
     values["net_income"] = _net_income(raw.lines, values["net_income"])
