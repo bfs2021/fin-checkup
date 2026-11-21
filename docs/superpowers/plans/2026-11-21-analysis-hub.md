@@ -87,7 +87,7 @@
 ### M. 알리기·기여
 | # | PR | 상태 |
 |---|---|---|
-| M1 | README 최상단 사이트 링크·화면 | ☐ |
+| M1 | README 최상단 사이트 링크·화면 | ☑ |
 | M2 | 영어 README | ☐ |
 | M3 | CONTRIBUTING · 이슈/PR 템플릿 | ☑ |
 | M4 | OPERATIONS 에 사이트 운영 절 | ☑ |
