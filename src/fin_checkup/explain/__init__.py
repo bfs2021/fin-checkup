@@ -14,16 +14,26 @@ from fin_checkup.explain.metrics import (
     get_explainer,
     threshold_text,
 )
+from fin_checkup.explain.redflags import (
+    RED_FLAG_EXPLAINERS,
+    RedFlagExplainer,
+    get_red_flag_explainer,
+    red_flag_explainers,
+)
 from fin_checkup.explain.why import why_color
 
 __all__ = [
     "METRIC_EXPLAINERS",
     "MetricExplainer",
+    "RED_FLAG_EXPLAINERS",
+    "RedFlagExplainer",
     "SectorCaveat",
     "SpecialRule",
     "band_ranges",
     "explainers",
     "get_explainer",
+    "get_red_flag_explainer",
+    "red_flag_explainers",
     "threshold_text",
     "why_color",
 ]
