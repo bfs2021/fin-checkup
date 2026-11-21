@@ -15,7 +15,7 @@ from fin_checkup.config import Settings
 from fin_checkup.config import settings as default_settings
 from fin_checkup.dart.client import DartClient
 from fin_checkup.dart.normalize import normalize_statements
-from fin_checkup.metrics.engine import MONEY, CheckupResult, checkup
+from fin_checkup.metrics.engine import MONEY, CheckupResult, checkup, comparison_base
 from fin_checkup.metrics.peers import (
     MIN_PEERS,
     PeerScope,
@@ -185,7 +185,9 @@ class CheckupService:
             return None
 
         latest = history[-1]
-        prior = next((f for f in history if f.bsns_year == latest.bsns_year - 1), None)
+        prior = comparison_base(
+            latest, next((f for f in history if f.bsns_year == latest.bsns_year - 1), None)
+        )
 
         company = await self.ensure_company(corp.corp_code, allow_fetch=allow_fetch)
         sector = sector_for(

@@ -512,3 +512,29 @@ def test_cash_generated_line_is_kept_when_it_is_the_only_candidate():
         line("CF", "ifrs-full_CashFlowsFromUsedInOperatingActivities", "영업에서 창출된 현금흐름", 145.0),
     ))
     assert fin.operating_cash_flow == 145.0
+# ── 전기 열(frmtrm) — 같은 보고서가 적은 작년 ─────────────────────────
+
+
+def test_comparative_period_comes_from_the_prior_year_column():
+    """작년 숫자는 작년 보고서보다 올해 보고서의 전기 열이 맞다 — 재작성·연결 범위가 올해와 같다.
+
+    (주)효성 2024: 분할로 중단영업을 재분류해 전기 매출이 3.44조 → 1.85조로 다시 적혔다.
+    """
+    fin = normalize_statements(raw(
+        AccountLine(sj_div="IS", account_id="ifrs-full_Revenue", account_nm="매출액",
+                    thstrm_amount=2273.0, frmtrm_amount=1847.0),
+        AccountLine(sj_div="BS", account_id="ifrs-full_Assets", account_nm="자산총계",
+                    thstrm_amount=9000.0, frmtrm_amount=8000.0),
+    ))
+    assert fin.revenue == 2273.0
+    prior = fin.comparative
+    assert prior is not None
+    assert (prior.bsns_year, prior.fs_div, prior.revenue, prior.total_assets) == (
+        2023, FsDiv.CFS, 1847.0, 8000.0,
+    )
+    assert prior.comparative is None
+
+
+def test_report_without_a_prior_year_column_has_no_comparative():
+    fin = normalize_statements(raw(line("IS", "ifrs-full_Revenue", "매출액", 100.0)))
+    assert fin.comparative is None

@@ -122,6 +122,14 @@ def test_revenue_growth_needs_prior_year():
     assert m.signal is Signal.GREEN
 
 
+def test_growth_compares_against_this_reports_prior_column_first():
+    """작년 보고서 숫자보다 올해 보고서의 전기 열이 우선이다 — 재작성·연결 범위가 올해와 같다."""
+    current = fin(revenue=1200, comparative=fin(bsns_year=2023, revenue=1000))
+    stale = fin(bsns_year=2023, fs_div=FsDiv.OFS, revenue=500)
+    assert get(checkup(current, prior=stale), "revenue_growth").value == pytest.approx(20.0)
+    assert get(checkup(current), "revenue_growth").value == pytest.approx(20.0)
+
+
 def test_growth_is_unknown_without_prior_year():
     m = get(checkup(fin(revenue=1200)), "revenue_growth")
     assert m.signal is Signal.UNKNOWN
