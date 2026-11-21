@@ -6,7 +6,7 @@ import html
 from datetime import date
 
 import pytest
-from hub_seed import HLB, KB, SAMSUNG, seed_site_cache
+from hub_seed import DELISTED, HLB, KB, SAMSUNG, seed_site_cache
 
 from fin_checkup.cli import main
 from fin_checkup.config import settings
@@ -48,6 +48,7 @@ async def test_builds_one_page_per_listed_company_with_statements(built):
     for corp in (SAMSUNG, KB, HLB):
         assert (out / "c" / corp.stock_code / "index.html").exists()
     assert not (out / "c" / "123456").exists(), "재무가 없는 회사는 페이지가 없다"
+    assert not (out / "c" / DELISTED.stock_code).exists(), "상장 시장이 아니면(OTHER) 페이지가 없다"
     assert (out / MARKER).exists()
 
 

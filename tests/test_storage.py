@@ -297,6 +297,11 @@ def test_reopening_purges_foreign_currency_money_metrics(tmp_path):
         assert c.get_meta(_MIGRATION_FOREIGN_MONEY) == "done"
 
 
+def _listed(corp_code: str, name: str, stock_code: str, market: Market | None, industry: str = "264"):
+    return Company(corp_code=corp_code, corp_name=name, stock_code=stock_code, market=market,
+                   industry_code=industry)
+
+
 def test_listed_with_statements_is_the_site_build_population(cache: Cache):
     """사이트는 상장사 중 그 해 사업보고서가 캐시에 있는 회사만 그린다. 종목코드순."""
     cache.save_corp_codes(
@@ -307,6 +312,9 @@ def test_listed_with_statements_is_the_site_build_population(cache: Cache):
             CorpCode(corp_code="00999999", corp_name="재무없음", stock_code="123456"),
         ]
     )
+    cache.save_company(_listed("00126380", "삼성전자", "005930", Market.KOSPI))
+    cache.save_company(_listed("00164779", "SK하이닉스", "000660", Market.KOSPI))
+    cache.save_company(_listed("00999999", "재무없음", "123456", Market.KOSDAQ))
     for code in ("00126380", "00164779", "00111722"):
         statements = raw()
         statements.corp_code = code
@@ -336,3 +344,49 @@ def test_reopening_purges_interest_coverage_computed_from_finance_costs(tmp_path
 
     with Cache(path) as c:
         assert c.peer_metric_values(["A"], 2024)["interest_coverage"] == [48.0], "한 번만 돈다"
+
+
+def test_listed_population_excludes_unlisted_markets(cache: Cache):
+    """종목코드가 남아 있어도 지금 상장돼 있지 않으면(DART corp_cls 'E' → OTHER) 모집단 밖이다.
+
+    corpCode.xml 은 상장폐지·비상장 전환 회사의 옛 종목코드를 그대로 둔다(신한은행 000010,
+    국민은행 …). 종목코드만 보면 실데이터 2024년에 217곳이 '상장사' 페이지를 받았다.
+    시장 구분을 모르는 회사(companies 행 없음·market NULL)도 상장이라고 단정하지 않는다.
+    """
+    corps = [
+        ("00126380", "삼성전자", "005930", Market.KOSPI),
+        ("00400000", "에이치엘비", "028300", Market.KOSDAQ),
+        ("00500000", "코넥스사", "200000", Market.KONEX),
+        ("00149646", "신한은행", "000010", Market.OTHER),
+        ("00700000", "시장모름", "300000", None),
+        ("00800000", "회사정보없음", "400000", None),
+    ]
+    cache.save_corp_codes([CorpCode(corp_code=c, corp_name=n, stock_code=s) for c, n, s, _ in corps])
+    for code, name, stock, market in corps[:-1]:
+        cache.save_company(_listed(code, name, stock, market))
+    for code, *_ in corps:
+        statements = raw()
+        statements.corp_code = code
+        cache.save_statements(statements)
+
+    listed = cache.list_listed_with_statements(2024)
+    assert [c.stock_code for c in listed] == ["005930", "028300", "200000"]
+
+
+def test_peer_populations_exclude_unlisted_companies(cache: Cache):
+    """대조군 라벨은 '동종업계 상장사'·'전체 상장사' 다. 상장 안 된 회사가 섞이면 라벨이 거짓이 된다."""
+    cache.save_company(_listed("00126380", "삼성전자", "005930", Market.KOSPI))
+    cache.save_company(_listed("00400000", "에이치엘비", "028300", Market.KOSDAQ))
+    cache.save_company(_listed("00149646", "신한은행", "000010", Market.OTHER))
+    cache.save_company(_listed("00700000", "시장모름", "300000", None))
+    for code in ("00126380", "00400000", "00149646", "00700000", "00800000"):
+        statements = raw()
+        statements.corp_code = code
+        cache.save_statements(statements)
+
+    assert cache.list_by_industry("26") == ["00126380", "00400000"]
+    assert cache.list_with_statements(2024) == ["00126380", "00400000"]
+    # 지표 미리 계산(backfill)은 상장 여부와 무관하게 재무가 있는 회사 전부를 본다.
+    assert cache.list_with_statements(2024, listed_only=False) == [
+        "00126380", "00149646", "00400000", "00700000", "00800000"
+    ]

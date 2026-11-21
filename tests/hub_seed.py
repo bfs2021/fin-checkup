@@ -5,6 +5,7 @@
 - 에이치엘비(028300): 1개년뿐 → 작년 비교 없음.
 - 재무없음(123456): 상장사지만 재무가 없다 → 페이지가 생기지 않는다.
 - 비상장: 종목코드 없음 → 모집단 밖.
+- 신한은행(000010): 옛 종목코드는 남았지만 시장 구분이 OTHER(상장 아님) → 모집단 밖.
 """
 
 from __future__ import annotations
@@ -17,6 +18,7 @@ KB = CorpCode(corp_code="00688996", corp_name="KB금융", stock_code="105560")
 HLB = CorpCode(corp_code="00400000", corp_name="에이치엘비", stock_code="028300")
 NO_DATA = CorpCode(corp_code="00999999", corp_name="재무없음", stock_code="123456")
 UNLISTED = CorpCode(corp_code="00111111", corp_name="비상장", stock_code="")
+DELISTED = CorpCode(corp_code="00149646", corp_name="신한은행", stock_code="000010")
 
 
 def statements(corp_code: str, year: int, revenue: float, operating_income: float) -> RawStatements:
@@ -46,7 +48,7 @@ def statements(corp_code: str, year: int, revenue: float, operating_income: floa
 
 
 def seed_site_cache(cache: Cache) -> None:
-    cache.save_corp_codes([SAMSUNG, KB, HLB, NO_DATA, UNLISTED])
+    cache.save_corp_codes([SAMSUNG, KB, HLB, NO_DATA, UNLISTED, DELISTED])
     cache.save_company(
         Company(
             corp_code=SAMSUNG.corp_code,
@@ -65,9 +67,30 @@ def seed_site_cache(cache: Cache) -> None:
             industry_code="64992",
         )
     )
+    cache.save_company(
+        Company(
+            corp_code=HLB.corp_code,
+            corp_name="에이치엘비",
+            stock_code="028300",
+            market=Market.KOSDAQ,
+        )
+    )
+    cache.save_company(
+        Company(corp_code=NO_DATA.corp_code, corp_name="재무없음", stock_code="123456", market=Market.KOSDAQ)
+    )
+    cache.save_company(
+        Company(
+            corp_code=DELISTED.corp_code,
+            corp_name="신한은행",
+            stock_code="000010",
+            market=Market.OTHER,
+            industry_code="64121",
+        )
+    )
     for year, revenue, op in [(2022, 1100.0, 180.0), (2023, 1200.0, 150.0), (2024, 900.0, 40.0)]:
         cache.save_statements(statements(SAMSUNG.corp_code, year, revenue, op))
     for year in (2023, 2024):
         cache.save_statements(statements(KB.corp_code, year, 3000.0, 600.0))
     cache.save_statements(statements(HLB.corp_code, 2024, 100.0, -50.0))
     cache.save_statements(statements(UNLISTED.corp_code, 2024, 100.0, 10.0))
+    cache.save_statements(statements(DELISTED.corp_code, 2024, 500.0, 60.0))

@@ -214,7 +214,7 @@ def db_with_peers(tmp_path, monkeypatch):
     """동종업계 표본이 있는 캐시. 대조군 표시를 검증하려면 견줄 대상이 있어야 한다."""
     import streamlit as st
 
-    from fin_checkup.models import Company
+    from fin_checkup.models import Company, Market
 
     db_path = tmp_path / "peers.duckdb"
     monkeypatch.setattr(settings, "fin_checkup_db_path", db_path)
@@ -223,7 +223,8 @@ def db_with_peers(tmp_path, monkeypatch):
     with Cache(db_path) as cache:
         codes = [CorpCode(corp_code="00126380", corp_name="삼성전자", stock_code="005930")]
         cache.save_company(Company(corp_code="00126380", corp_name="삼성전자",
-                                   stock_code="005930", industry_code="26410"))
+                                   stock_code="005930", market=Market.KOSPI,
+                                   industry_code="26410"))
         for year, rev, op in [(2023, 1200.0, 150.0), (2024, 900.0, 40.0)]:
             cache.save_statements(statements(year, rev, op))
 
@@ -232,7 +233,7 @@ def db_with_peers(tmp_path, monkeypatch):
             code = f"9200000{i}"
             codes.append(CorpCode(corp_code=code, corp_name=f"동종{i}", stock_code=f"90000{i}"))
             cache.save_company(Company(corp_code=code, corp_name=f"동종{i}",
-                                       industry_code=f"26{i}90"))
+                                       market=Market.KOSDAQ, industry_code=f"26{i}90"))
             for year in (2023, 2024):
                 raw = statements(year, 800.0 + i * 60, 30.0 + i * 12)
                 raw.corp_code = code
