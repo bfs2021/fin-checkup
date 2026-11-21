@@ -11,6 +11,14 @@ from fin_checkup.explain.disclosures import (
     disclosure_explainers,
     get_disclosure_explainer,
 )
+from fin_checkup.explain.glossary import (
+    GLOSSARY,
+    GLOSSARY_BY_SLUG,
+    GlossaryTerm,
+    find_term,
+    get_term,
+    terms_for_metric,
+)
 from fin_checkup.explain.metrics import (
     METRIC_EXPLAINERS,
     MetricExplainer,
@@ -30,6 +38,12 @@ from fin_checkup.explain.redflags import (
 from fin_checkup.explain.why import why_color
 
 __all__ = [
+    "GLOSSARY",
+    "GLOSSARY_BY_SLUG",
+    "GlossaryTerm",
+    "find_term",
+    "get_term",
+    "terms_for_metric",
     "DISCLOSURE_EXPLAINERS",
     "HOW_TO_READ_ON_DART",
     "DisclosureExplainer",
