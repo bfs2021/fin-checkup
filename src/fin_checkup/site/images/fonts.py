@@ -170,3 +170,16 @@ def resolve_fonts() -> FontSet | None:
     from fin_checkup.config import settings
 
     return find_fonts(settings.fin_checkup_font_regular, settings.fin_checkup_font_bold)
+
+
+def missing_glyphs(text: str, font: ImageFont.FreeTypeFont) -> set[str]:
+    """이 글꼴이 그리지 못하는 글자 — 두부(□)로 찍힐 것들. 컬러 이모지(🟢)가 대표적이다."""
+    notdef = font.getmask("\U000f0001")
+    missing = set()
+    for ch in set(text):
+        if ch.isspace():
+            continue
+        mask = font.getmask(ch)
+        if mask.size == notdef.size and bytes(mask) == bytes(notdef):
+            missing.add(ch)
+    return missing

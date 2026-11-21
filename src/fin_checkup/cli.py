@@ -554,6 +554,46 @@ async def cmd_site_check(args: argparse.Namespace) -> int:
     return 1
 
 
+async def cmd_site_cards(args: argparse.Namespace) -> int:
+    """회사 한 곳의 카드뉴스 PNG 를 만든다. 캐시만 읽고, 어디에도 올리지 않는다 (docs/card-news.md)."""
+    import time
+
+    from fin_checkup.site.build import HISTORY_YEARS, _offline_service
+    from fin_checkup.site.images.cards import card_deck, draw_deck
+    from fin_checkup.site.images.fonts import INSTALL_HINT, resolve_fonts
+
+    fonts = resolve_fonts()
+    if fonts is None:
+        print(INSTALL_HINT)
+        return 1
+    db_path = Path(settings.fin_checkup_db_path)
+    if not db_path.exists():
+        print(f"캐시 DB 가 없습니다: {db_path}  (FIN_CHECKUP_DB_PATH 로 지정할 수 있습니다)")
+        return 1
+    with Cache(db_path, read_only=True) as cache:
+        corp = cache.find_by_stock_code(args.stock_code)
+        if corp is None:
+            print(f"종목코드 {args.stock_code} 를 캐시에서 찾지 못했습니다.")
+            return 1
+        service = _offline_service(cache)
+        data = await service.run(corp, end_year=args.year, years=HISTORY_YEARS, allow_fetch=False)
+    if data is None or data.history[-1].bsns_year != args.year:
+        print(f"{corp.corp_name} 의 {args.year} 사업연도 재무가 캐시에 없습니다.")
+        return 1
+
+    out = Path(args.out)
+    out.mkdir(parents=True, exist_ok=True)
+    started = time.perf_counter()
+    pages = draw_deck(card_deck(data, args.base_url), fonts)
+    for name, canvas in pages:
+        (out / name).write_bytes(canvas.png())
+        print(f"  {out / name}")
+    seconds = time.perf_counter() - started
+    print(f"{corp.corp_name} 카드 {len(pages)}장 · {seconds:.1f}초")
+    print("올리기 전에 docs/card-news.md 의 규칙을 볼 것 (출처·면책을 지우지 않는다).")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(message)s")
 
@@ -678,6 +718,19 @@ def main(argv: list[str] | None = None) -> int:
         help="`disclosures fetch` 가 쓴 JSON — 회사별·시장 전체 Atom 피드에 위험 공시를 싣는다 (없으면 생략)",
     )
     p_site_build.set_defaults(func=cmd_site_build)
+
+    p_site_cards = site_sub.add_parser(
+        "cards", help="카드뉴스 PNG (1080×1350, 5~6장) — 만들기만 하고 올리지 않는다"
+    )
+    p_site_cards.add_argument("stock_code", help="종목코드 6자리")
+    p_site_cards.add_argument("--out", required=True, help="PNG 를 쓸 폴더")
+    p_site_cards.add_argument("--year", type=int, default=default_fiscal_year(), help="기준 사업연도")
+    p_site_cards.add_argument(
+        "--base-url",
+        default="https://younghwan91.github.io/fin-checkup/",
+        help="마지막 장에 적을 사이트 주소",
+    )
+    p_site_cards.set_defaults(func=cmd_site_cards)
     p_site_check = site_sub.add_parser(
         "check", help="빌드된 사이트를 가드 규칙으로 검사 (위반이 있으면 종료 코드 1)"
     )

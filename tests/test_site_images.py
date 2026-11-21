@@ -132,6 +132,7 @@ def _card(**overrides) -> OgCard:
 def test_og_card_has_no_text_outside_the_card(fonts, card):
     canvas = draw_og(card, fonts)
     assert canvas.overflow(margin=24) == []
+    assert canvas.collisions() == []
 
 
 def test_og_card_carries_source_disclaimer_and_counts_not_a_score(fonts):
