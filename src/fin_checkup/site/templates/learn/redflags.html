@@ -1,0 +1,27 @@
+{#
+  위험 신호 해설 `/learn/redflags/`. 넘길 값: flags(explain.RedFlagExplainer 목록). 앵커는 RedFlag.key.
+#}
+{% extends "base.html" %}
+{% block title %}위험 신호 해설 — 자본잠식·연속 영업손실·이자보상배율 · fin-checkup{% endblock %}
+{% block description %}재무제표만으로 확인되는 위험 신호 {{ flags | length }}가지(완전자본잠식, 자본잠식률, 연속 영업손실, 흑자인데 영업현금 유출, 이자보상배율 연속 1 미만)가 무엇을 뜻하고 어떻게 찾는지.{% endblock %}
+{% block main %}
+<article class="fc-learn">
+  <p class="fc-basis"><a href="{{ url('learn/') }}">배우기</a></p>
+  <h1>위험 신호 해설</h1>
+  <p class="fc-lead">회사 페이지의 '위험 신호'는 재무제표 숫자만으로 확인되는 사실이에요. 상장폐지나 관리종목 지정은 거래소가 여러 요건과 절차를 거쳐 정하기 때문에, 여기서는 그 요건에 해당하는 수치가 보였다는 데까지만 말해요.</p>
+  {% for f in flags %}
+  <section class="fc-section" id="{{ f.key }}" aria-labelledby="{{ f.key }}-title">
+    <h2 id="{{ f.key }}-title"><span aria-hidden="true">🔴</span> {{ f.title }}</h2>
+    <dl class="fc-explain-list">
+      <dt>무슨 상태인가요</dt><dd>{{ f.what }}</dd>
+      <dt>왜 중요한가요</dt><dd>{{ f.why_matters }}</dd>
+      <dt>어떻게 찾나요</dt><dd>{{ f.detection }}</dd>
+    </dl>
+  </section>
+  {% endfor %}
+  <section class="fc-section" id="not-here" aria-labelledby="not-here-title">
+    <h2 id="not-here-title">여기서 보지 않는 것</h2>
+    <p>감사의견, 유상증자, 전환사채(CB)·신주인수권부사채(BW), 최대주주 지분 변화는 재무제표가 아니라 공시를 봐야 알 수 있어요. 이런 공시가 무엇인지는 <a href="{{ url('learn/disclosures/') }}">위험 공시 유형</a>에 정리했어요.</p>
+  </section>
+</article>
+{% endblock %}

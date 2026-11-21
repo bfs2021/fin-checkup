@@ -1,0 +1,91 @@
+{#
+  재무제표 처음 읽기 `/learn/first-read/`. 넘길 값: fr(learn.FirstRead 또는 None), legend, rule_text, rounding_note, glossary_path.
+  예시 회사는 site.examples.default_example — 지표 해설 페이지와 같은 회사. 회사의 색을 두고 좋다·나쁘다를 말하지 않는다.
+#}
+{% extends "base.html" %}
+{% block title %}재무제표 처음 읽기 — 회사 페이지 하나를 위에서부터 · fin-checkup{% endblock %}
+{% block description %}회계를 몰라도 읽을 수 있게, 실제 상장사 페이지 하나를 위에서부터 따라 읽어요. 숫자가 어디서 오는지, 신호등 🟢🟡🔴⚪⊘⚫ 읽는 법, 이 도구가 알려 주지 못하는 것.{% endblock %}
+{% block main %}
+<article class="fc-learn fc-guide">
+  <p class="fc-basis"><a href="{{ url('learn/') }}">배우기</a></p>
+  <h1>재무제표 처음 읽기</h1>
+  <p class="fc-lead">재무제표는 회사가 1년 동안 어떻게 장사했고, 지금 무엇을 가지고 있고, 얼마를 빚지고 있는지 적은 성적표 같은 서류예요. 이 페이지에서는 실제 회사 페이지 하나를 위에서부터 같이 읽어 봐요.</p>
+
+  {% if fr %}
+  {% set c = fr.c %}
+  {% set home = fr.entry.path %}
+  <section class="fc-section" id="example" aria-labelledby="example-title">
+    <h2 id="example-title">오늘 같이 읽을 회사: {{ c.name }}</h2>
+    <p><a href="{{ url(home) }}">{{ c.name }} 회사 페이지</a>를 다른 창에 열어 두고 함께 보면 편해요.</p>
+    <p class="fc-hint">{{ rule_text }}</p>
+  </section>
+
+  <section class="fc-section" id="source" aria-labelledby="source-title">
+    <h2 id="source-title">1. 숫자는 어디서 오나요</h2>
+    <p>모든 숫자는 회사가 금융감독원 <a href="{{ url(glossary_path('dart')) }}">전자공시시스템(DART)</a>에 낸 <a href="{{ url(glossary_path('annual-report')) }}">사업보고서</a>에서 왔어요. 상장사는 사업연도가 끝나면 1년에 한 번 사업보고서를 내고, 그 안에 재무제표가 들어 있어요. 이 페이지의 {{ c.name }} 숫자는 {{ c.year }}년 {{ c.report_label }}의 {{ c.statement_label }}예요.</p>
+    <p>재무제표는 세 장의 표로 나뉘어요.</p>
+    <ul>
+      <li><a href="{{ url(glossary_path('balance-sheet')) }}"><b>재무상태표</b></a> — 연말 그날 회사가 가진 것(자산), 갚아야 할 것(부채), 그 차이인 주주 몫(자본).</li>
+      <li><a href="{{ url(glossary_path('income-statement')) }}"><b>손익계산서</b></a> — 1년 동안 얼마를 팔았고(매출) 비용을 빼고 얼마가 남았는지(이익).</li>
+      <li><a href="{{ url(glossary_path('cash-flow-statement')) }}"><b>현금흐름표</b></a> — 1년 동안 현금이 실제로 어디서 들어오고 어디로 나갔는지.</li>
+    </ul>
+    <p>{{ c.name }}의 {{ c.year }} 사업연도 주요 숫자를 표별로 옮기면 이래요.</p>
+    <dl class="fc-basis-list fc-worked">
+      {% for n in fr.numbers %}
+      <dt>{% if n.term %}<a href="{{ url(glossary_path(n.term)) }}">{{ n.label }}</a>{% else %}{{ n.label }}{% endif %}</dt><dd>{{ n.text }} <small>({{ n.statement }})</small></dd>
+      {% endfor %}
+    </dl>
+    <p class="fc-hint">{{ rounding_note }} 자산총계는 부채총계와 자본총계를 더한 값과 같아요 — 재무상태표의 기본 약속이에요.</p>
+  </section>
+
+  <section class="fc-section" id="walk" aria-labelledby="walk-title">
+    <h2 id="walk-title">2. 회사 페이지를 위에서부터</h2>
+
+    <h3><a href="{{ url(home) }}#summary">맨 위 — 이름과 신호 개수</a></h3>
+    <p>회사 이름 옆에 종목코드와 시장(KOSPI·KOSDAQ)이 있고, 그 아래 어느 해의 어떤 보고서로 계산했는지가 적혀 있어요. {{ fr.name_topic }} "{{ c.year }}년 {{ c.report_label }} · {{ c.statement_label }} · {{ c.sector_label }} 기준"이에요.</p>
+    <p>그 아래 칩은 신호마다 지표가 몇 개인지 센 것이에요. {{ fr.name_topic }} {% for chip in c.chips %}{{ chip.signal.emoji }} {{ chip.signal.label }} {{ chip.count }}개{% if not loop.last %}, {% endif %}{% endfor %}예요. 이 개수를 더하거나 빼서 점수를 만들지는 않아요. 지표마다 뜻이 달라서, 하나씩 읽어야 해요.</p>
+
+    <h3><a href="{{ url(home) }}#metrics">지표 17개</a></h3>
+    <p>지표는 다섯 묶음(수익성·안정성·성장성·이익의 질·효율성)으로 나뉘어 있어요. 카드 하나에는 신호, 값, <b>계산식</b>, <b>경계값</b>(어느 값부터 어느 색인지), 작년 값이 함께 있어요. 색만 보지 말고 계산식과 경계값을 같이 읽으면, 왜 그 색인지 직접 확인할 수 있어요.</p>
+    <p>예를 들어 <a href="{{ url('m/operating_margin/') }}">{{ fr.sample_metric_label }}</a>({{ fr.sample_metric_easy }})의 계산식은 이래요 — <b>{{ fr.sample_formula }}</b>. 해설 페이지의 '실제 숫자로 계산해 보기'에 {{ c.name }}의 숫자를 그대로 넣은 계산 과정이 있어요. 지표 이름을 누르면 어느 지표든 해설로 가요.</p>
+    <p>카드 안의 띠 그림은 같은 업종 회사들의 값이 어떻게 퍼져 있는지(가운데 50%와 중앙값) 위에 이 회사가 어디쯤인지 보여 줘요. 순위가 아니라 분포예요.</p>
+
+    <h3><a href="{{ url(home) }}#trend">몇 년 추이</a></h3>
+    <p>최근 몇 해의 매출·이익·현금흐름 같은 숫자를 막대로 보여 줘요. 한 해 숫자만으로는 일시적인 변화인지 알 수 없어서, 흐름을 함께 봐요. 값이 없는 해는 0으로 그리지 않고 ⚫로 비워 둬요.</p>
+
+    <h3><a href="{{ url(home) }}#red-flags">위험 신호</a></h3>
+    <p>자본잠식이나 몇 년 연속 영업손실처럼 재무제표만으로 확인되는 사실을 따로 모아 둔 곳이에요. 무엇을 뜻하는지는 <a href="{{ url('learn/redflags/') }}">위험 신호 해설</a>에 있어요.</p>
+
+    <h3><a href="{{ url(home) }}#changes">작년과 달라진 것</a></h3>
+    <p>작년과 견줘 등급이 내려갔거나, 같은 등급 안에서도 크게 움직인 지표를 모아 둬요.</p>
+
+    <h3><a href="{{ url(home) }}#same-sector">같은 업종 회사</a></h3>
+    <p>같은 업종의 다른 회사로 건너갈 수 있어요. 지표 값이 아니라 이름순으로 이웃한 회사들이에요. 업종 전체의 지표 분포는 <a href="{{ url('s/') }}">업종 페이지</a>에 있어요.</p>
+  </section>
+
+  <section class="fc-section" id="legend" aria-labelledby="legend-title">
+    <h2 id="legend-title">3. 신호등 여섯 가지</h2>
+    <ul class="fc-legend">
+      {% for s in legend %}
+      <li class="fc-chip sig-{{ s.signal.key }}"><span aria-hidden="true">{{ s.signal.emoji }}</span> <b>{{ s.signal.label }}</b> — {{ s.meaning }}</li>
+      {% endfor %}
+    </ul>
+    <p>🟢🟡🔴는 경계값으로 나눈 구간이에요. ⚪는 값은 있지만 업종마다 너무 달라 경계값을 두지 않은 지표, ⊘는 그 업종에는 맞지 않는 자라서 재지 않은 지표, ⚫는 공시에서 숫자를 찾지 못한 지표예요. ⊘와 ⚫를 0이나 🔴로 바꾸지 않아요.</p>
+  </section>
+
+  <section class="fc-section" id="limits" aria-labelledby="limits-title">
+    <h2 id="limits-title">4. 이 도구가 알려 주지 못하는 것</h2>
+    <ul>
+      <li><b>주가가 비싼지 싼지</b> — 재무제표만 보고, 주가나 시가총액은 보지 않아요.</li>
+      <li><b>앞으로의 실적</b> — 모든 숫자는 이미 끝난 사업연도의 기록이에요.</li>
+      <li><b>사업의 내용</b> — 무엇을 팔고, 경쟁 회사와 어떻게 다른지는 사업보고서 본문에 있어요.</li>
+      <li><b>분기 사이의 변화</b> — 1년에 한 번 나오는 사업보고서 기준이라, 그 사이에 생긴 일은 반영되지 않아요.</li>
+      <li><b>공시로만 알 수 있는 일</b> — 감사의견, 유상증자, 전환사채, 최대주주 변경은 <a href="{{ url('learn/disclosures/') }}">위험 공시 유형</a>에서 무엇인지 볼 수 있고, 실제 공시는 DART에서 확인해요.</li>
+      <li><b>사고팔 때</b> — 신호등은 측정 결과일 뿐이에요. 판단은 읽는 분의 몫이에요.</li>
+    </ul>
+  </section>
+  {% else %}
+  <p>이 빌드에는 예시로 쓸 회사가 없어요. <a href="{{ url('m/') }}">지표 해설</a>부터 읽어 보세요.</p>
+  {% endif %}
+</article>
+{% endblock %}

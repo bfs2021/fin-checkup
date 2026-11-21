@@ -40,7 +40,7 @@
 | U4 | 위험 신호 해설 (`explain/redflags.py`) | ☑ |
 | U5 | 위험 공시 유형 해설 (`explain/disclosures.py`) | ☑ |
 | U6 | 용어집 60개 (`explain/glossary.py`) | ☑ |
-| U7 | 재무제표 처음 읽기 가이드 | ☐ |
+| U7 | 재무제표 처음 읽기 가이드 | ☑ |
 | U8 | 업종별 읽는 법 (금융·보험·지주 ⊘) | ☐ |
 
 ### V. 시각
