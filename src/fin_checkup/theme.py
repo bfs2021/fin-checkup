@@ -11,11 +11,12 @@ from __future__ import annotations
 
 from fin_checkup.metrics.signals import Signal
 
-#: 상태 전용. 차트 계열색으로 재사용하지 않는다.
+#: 상태 전용. 차트 계열색으로 재사용하지 않는다. site.css 밝은 모드와 같고, 정상·주의·위험은 색각 이상
+#: 시뮬레이션에서도 서로 갈려야 한다(tests/test_site_colorblind.py).
 SIGNAL_COLORS: dict[Signal, str] = {
-    Signal.GREEN: "#0ca30c",
-    Signal.YELLOW: "#fab219",
-    Signal.RED: "#d03b3b",
+    Signal.GREEN: "#11a102",
+    Signal.YELLOW: "#fcb51d",
+    Signal.RED: "#b93e41",
     Signal.NEUTRAL: "#8c8c88",
     Signal.NOT_APPLICABLE: "#b4b4ae",
     Signal.UNKNOWN: "#6e6e69",
