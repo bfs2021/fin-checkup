@@ -15,17 +15,23 @@
 - `handler`     인라인 이벤트 핸들러(`onclick=` …)·`javascript:` 주소 없음.
 - `storage`     쿠키·sessionStorage·indexedDB 없음. localStorage 는 `fin-checkup:` 키만.
 - `secret`      DART 인증키처럼 생긴 40자리 16진수·`crtfc_key` 가 어떤 파일에도 없다.
+- `banned`      추천·매매 권유·재촉 표현(`explain.banned`)이 빌드된 HTML·템플릿·해설 데이터에 없다.
+                예외는 `ALLOWED_SENTENCES` 의 문장 그대로와, 검색 인덱스의 회사 이름(데이터)뿐.
 """
 
 from __future__ import annotations
 
+import json
 import re
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
 from html.parser import HTMLParser
+from importlib.resources import files
+from importlib.resources.abc import Traversable
 from pathlib import Path
 
 from fin_checkup.disclaimer import DISCLAIMER
+from fin_checkup.explain import banned
 
 #: 판정한 신호. 이 신호의 지표는 경계값을 반드시 보여야 한다 — 왜 이 색인지 감추지 않는다.
 JUDGED_SIGNALS = frozenset({"sig-green", "sig-yellow", "sig-red"})
@@ -257,29 +263,73 @@ def _check_secrets(path: str, text: str) -> Iterator[Violation]:
         yield Violation(path, "secret", "crtfc_key (DART 인증키 파라미터)")
 
 
-def check_file(path: str, data: bytes) -> list[Violation]:
-    """파일 하나. `path` 는 출력 폴더 기준 경로(확장자로 규칙을 고른다)."""
+def _check_banned(path: str, text: str, proper_nouns: Iterable[str]) -> Iterator[Violation]:
+    for phrase in banned.find_outside_allowed(text, proper_nouns):
+        at = text.find(phrase)
+        context = " ".join(text[max(0, at - 30) : at + len(phrase) + 30].split())
+        yield Violation(path, "banned", f"금지 표현 '{phrase}' — …{context}…")
+
+
+def check_file(path: str, data: bytes, proper_nouns: Iterable[str] = ()) -> list[Violation]:
+    """파일 하나. `path` 는 출력 폴더 기준 경로(확장자로 규칙을 고른다).
+
+    `proper_nouns` 는 금지 표현 검사에서 걷어낼 고유명사(회사 이름) — `check_site` 가 검색 인덱스에서 읽는다.
+    """
     suffix = Path(path).suffix.lower()
     # 바이너리(ico·png)도 인증키 검사는 한다 — latin-1 은 어떤 바이트든 글자로 읽는다.
     text = data.decode("utf-8") if suffix in _TEXT_SUFFIXES else data.decode("latin-1")
     found = list(_check_secrets(path, text))
     if suffix == ".html":
         found += _check_page(path, text)
+        found += _check_banned(path, text, proper_nouns)
     if suffix in {".html", ".js"}:
         found += _check_storage(path, text)
     return found
 
 
-def check_site(out: Path) -> list[Violation]:
-    """출력 폴더 전체. 위반이 없으면 빈 목록."""
+TEMPLATES = files("fin_checkup.site") / "templates"
+_JINJA_COMMENT = re.compile(r"\{#.*?#\}", re.DOTALL)
+
+
+def _walk_templates(node: Traversable, prefix: str) -> Iterator[tuple[str, Traversable]]:
+    for child in sorted(node.iterdir(), key=lambda c: c.name):
+        if child.is_dir():
+            yield from _walk_templates(child, f"{prefix}{child.name}/")
+        elif child.name.endswith((".html", ".xml", ".svg", ".txt")):
+            yield f"{prefix}{child.name}", child
+
+
+def check_sources() -> list[Violation]:
+    """빌드와 무관하게 소스 쪽 — 사이트 템플릿(Jinja 주석 제외)과 `fin_checkup.explain` 해설 데이터."""
+    found: list[Violation] = []
+    for rel, resource in _walk_templates(TEMPLATES, "templates/"):
+        text = _JINJA_COMMENT.sub(" ", resource.read_text(encoding="utf-8"))
+        found += _check_banned(rel, text, ())
+    for where, text in banned.explain_texts():
+        found += _check_banned(where, text, ())
+    return found
+
+
+def _proper_nouns(out: Path) -> list[str]:
+    """검색 인덱스의 회사 이름. 인덱스가 없거나 깨졌으면 빈 목록(그만큼 엄격해질 뿐)."""
+    try:
+        payload = json.loads((out / "search-index.json").read_text(encoding="utf-8"))
+        return [c["name"] for c in payload["companies"]]
+    except (OSError, ValueError, KeyError, TypeError):
+        return []
+
+
+def check_site(out: Path, sources: bool = True) -> list[Violation]:
+    """출력 폴더 전체(+ 기본으로 템플릿·해설 데이터). 위반이 없으면 빈 목록."""
+    violations = check_sources() if sources else []
     if not out.is_dir():
-        return [Violation("", "site", f"출력 폴더가 없다: {out}")]
-    violations: list[Violation] = []
+        return [*violations, Violation("", "site", f"출력 폴더가 없다: {out}")]
+    nouns = _proper_nouns(out)
     pages = 0
     for file in sorted(p for p in out.rglob("*") if p.is_file()):
         rel = file.relative_to(out).as_posix()
         pages += rel.endswith(".html")
-        violations += check_file(rel, file.read_bytes())
+        violations += check_file(rel, file.read_bytes(), nouns)
     if not pages:
         violations.append(Violation("", "site", "HTML 페이지가 하나도 없다 — 빈 빌드는 통과시키지 않는다"))
     return violations
