@@ -50,7 +50,7 @@
 | V2 | 동종업계 분포 위 내 위치 SVG (`site/charts.py` `peer_strip`) | ☑ |
 | V3 | 공유 카드 OG 이미지 | ☐ |
 | V4 | 카드뉴스 이미지 생성 (1080×1350) | ☐ |
-| V5 | 블로그 임베드 배지 SVG | ☐ |
+| V5 | 블로그 임베드 배지 SVG `/badge/<코드>.svg` (`charts.badge_svg`) | ☑ |
 
 ### E. 탐색
 | # | PR | 상태 |
