@@ -1,0 +1,27 @@
+<section class="fc-section" id="metrics" aria-labelledby="metrics-title">
+  <h2 id="metrics-title">지표 {{ c.groups | map(attribute="rows") | map("length") | sum }}개</h2>
+  <p class="fc-hint">모든 지표에 계산식과 경계값을 함께 적습니다. 묶음 안에서는 위험한 것부터 보입니다.</p>
+  {% for group in c.groups %}
+  <h3>{{ group.category }}</h3>
+  <ul class="fc-metrics">
+    {% for m in group.rows %}
+    <li class="fc-metric sig-{{ m.signal.key }}" id="m-{{ m.key }}">
+      <div class="fc-metric-head">
+        <span class="fc-sig"><span aria-hidden="true">{{ m.signal.emoji }}</span> {{ m.signal.label }}</span>
+        <span class="fc-metric-label">{{ m.label }}</span>
+        <span class="fc-metric-value{% if m.missing %} muted{% endif %}">{{ m.value_text }}</span>
+      </div>
+      <p class="fc-desc">{{ m.description }}</p>
+      <dl class="fc-basis-list">
+        <dt>계산식</dt><dd>{{ m.formula }}</dd>
+        <dt>경계값</dt><dd>{{ m.band_text }}</dd>
+        {% if m.delta_text %}<dt>작년 대비</dt><dd>{{ m.delta_text }}</dd>{% endif %}
+      </dl>
+      {% if m.note %}
+      <p class="fc-note">{% if m.not_applicable %}<b>대신 볼 것</b> {% endif %}{{ m.note }}</p>
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  {% endfor %}
+</section>

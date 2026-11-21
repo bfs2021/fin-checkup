@@ -306,6 +306,7 @@ source = { editable = "." }
 dependencies = [
     { name = "duckdb" },
     { name = "httpx" },
+    { name = "jinja2" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
     { name = "tzdata" },
@@ -336,6 +337,7 @@ requires-dist = [
     { name = "fastapi", marker = "extra == 'api'", specifier = ">=0.115.0" },
     { name = "httpx", specifier = ">=0.27.0" },
     { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.27.0" },
+    { name = "jinja2", specifier = ">=3.1.6" },
     { name = "pandas", marker = "extra == 'ui'", specifier = ">=2.2.0" },
     { name = "playwright", marker = "extra == 'dev'", specifier = ">=1.40.0" },
     { name = "plotly", marker = "extra == 'ui'", specifier = ">=5.24.0" },

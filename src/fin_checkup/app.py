@@ -19,12 +19,11 @@ import streamlit as st
 from fin_checkup.config import settings
 from fin_checkup.fiscal import default_fiscal_year
 from fin_checkup.format import chart_scale, format_metric
-from fin_checkup.metrics.changes import detect_changes
-from fin_checkup.metrics.engine import MONEY, Category, Metric, checkup
+from fin_checkup.metrics.engine import Metric
 from fin_checkup.metrics.peers import PeerStat, SelfDelta
 from fin_checkup.metrics.sector import Sector
-from fin_checkup.metrics.signals import SEVERITY, Signal
 from fin_checkup.models import Financials
+from fin_checkup.presentation import band_text, metrics_by_category, recent_changes, summary_chips
 from fin_checkup.service import Checkup, CheckupService
 from fin_checkup.storage import Cache, CacheLocked
 from fin_checkup.theme import (
@@ -77,16 +76,6 @@ def get_cache() -> Cache | None:
 def get_service() -> CheckupService | None:
     cache = get_cache()
     return None if cache is None else CheckupService(cache)
-
-
-def band_text(metric: Metric) -> str:
-    if metric.band is None:
-        return "절대 기준 없음 — 추이와 업종 비교로 판단할 항목."
-    band = metric.band
-    unit = "" if metric.unit == MONEY else metric.unit
-    if band.higher_is_better:
-        return f"정상 {band.good}{unit} 이상 · 주의 {band.warn}{unit} 이상 · 그 미만은 위험"
-    return f"정상 {band.good}{unit} 이하 · 주의 {band.warn}{unit} 이하 · 그 초과는 위험"
 
 
 def _esc(text: str) -> str:
@@ -163,20 +152,13 @@ def render_metric(
     st.markdown("".join(parts), unsafe_allow_html=True)
 
 
-#: 요약 줄에 항상 보일 신호. 나머지(측정값·해당없음·데이터없음)는 0이면 감춘다.
-PRIMARY_SIGNALS = (Signal.RED, Signal.YELLOW, Signal.GREEN)
-SECONDARY_SIGNALS = (Signal.NEUTRAL, Signal.NOT_APPLICABLE, Signal.UNKNOWN)
-
-
 def render_summary(data: Checkup) -> None:
     """신호 개수 요약.
 
     0인 항목까지 다 보여주면 눈이 갈 곳을 잃는다. 정상/주의/위험은 늘 보이고
     나머지는 실제로 있을 때만 나온다.
     """
-    counts = data.result.counts
-    chips = [(s, counts[s]) for s in PRIMARY_SIGNALS]
-    chips += [(s, counts[s]) for s in SECONDARY_SIGNALS if counts[s]]
+    chips = summary_chips(data.result)
 
     html_parts = ['<div class="fc-summary">']
     for signal, count in chips:
@@ -228,18 +210,18 @@ def render_red_flags(data: Checkup) -> None:
 
 
 def render_changes(data: Checkup) -> None:
-    if len(data.history) < 3:
-        st.info("급변을 판단하려면 3개 사업연도 이상의 데이터가 필요합니다.")
+    window = recent_changes(data)
+    if window is None:
+        st.info("급변을 판단하려면 직전 사업연도 데이터가 함께 있어야 합니다.")
+        return
+    if not window.changes:
+        st.success(
+            f"{window.prior_year} → {window.latest_year}년 사이 급격히 나빠진 지표는 없습니다."
+        )
         return
 
-    latest, prev, prev2 = data.history[-1], data.history[-2], data.history[-3]
-    changes = detect_changes(checkup(latest, prev), checkup(prev, prev2))
-    if not changes:
-        st.success(f"{prev.bsns_year} → {latest.bsns_year}년 사이 급격히 나빠진 지표는 없습니다.")
-        return
-
-    st.caption(f"{prev.bsns_year} → {latest.bsns_year}년 비교")
-    for change in changes:
+    st.caption(f"{window.prior_year} → {window.latest_year}년 비교")
+    for change in window.changes:
         st.warning(f"**{change.label}** — {change.summary}")
 
 
@@ -436,16 +418,12 @@ def main() -> None:
                 "업종 비교는 같은 업종 기업이 캐시에 5곳 이상 있어야 표시됩니다. "
                 "`python -m fin_checkup.cli collect`로 채울 수 있습니다."
             )
-        for category in Category:
-            metrics = data.result.by_category(category)
-            if not metrics:
-                continue
+        # 묶음 안에서는 나쁜 것부터 (presentation.metrics_by_category).
+        for category, ordered in metrics_by_category(data.result):
             st.markdown(
                 f'<div class="fc-section">{_esc(category.value)}</div>',
                 unsafe_allow_html=True,
             )
-            # 나쁜 것부터 보이게 정렬한다. 사용자가 먼저 봐야 할 건 위험한 쪽이다.
-            ordered = sorted(metrics, key=lambda m: -SEVERITY[m.signal])
             for row_start in range(0, len(ordered), 4):
                 cols = st.columns(4)
                 for col, metric in zip(cols, ordered[row_start : row_start + 4], strict=False):

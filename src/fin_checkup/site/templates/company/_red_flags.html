@@ -1,0 +1,13 @@
+<section class="fc-section" id="red-flags" aria-labelledby="red-flags-title">
+  <h2 id="red-flags-title">위험 신호</h2>
+  {% if c.red_flags %}
+  <ul class="fc-flags">
+    {% for flag in c.red_flags %}
+    <li class="sig-red"><span aria-hidden="true">🔴</span> <b>{{ flag.label }}</b> — {{ flag.detail }}{% if flag.reference %}<br><small>{{ flag.reference }}</small>{% endif %}</li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p>재무제표에서 확인되는 위험 신호는 없습니다.</p>
+  {% endif %}
+  <p class="fc-hint">감사의견·유상증자·CB/BW·최대주주 지분 변화는 공시 데이터가 필요해 여기서는 보지 않습니다.</p>
+</section>

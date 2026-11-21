@@ -295,3 +295,23 @@ def test_reopening_purges_foreign_currency_money_metrics(tmp_path):
         assert values["fcf"] == [7.0]
         assert sorted(values["roe"]) == [10.0, 12.0]
         assert c.get_meta(_MIGRATION_FOREIGN_MONEY) == "done"
+
+
+def test_listed_with_statements_is_the_site_build_population(cache: Cache):
+    """사이트는 상장사 중 그 해 사업보고서가 캐시에 있는 회사만 그린다. 종목코드순."""
+    cache.save_corp_codes(
+        [
+            CorpCode(corp_code="00126380", corp_name="삼성전자", stock_code="005930"),
+            CorpCode(corp_code="00164779", corp_name="SK하이닉스", stock_code="000660"),
+            CorpCode(corp_code="00111722", corp_name="비상장", stock_code=""),
+            CorpCode(corp_code="00999999", corp_name="재무없음", stock_code="123456"),
+        ]
+    )
+    for code in ("00126380", "00164779", "00111722"):
+        statements = raw()
+        statements.corp_code = code
+        cache.save_statements(statements)
+
+    listed = cache.list_listed_with_statements(2024)
+    assert [c.stock_code for c in listed] == ["000660", "005930"]
+    assert cache.list_listed_with_statements(2023) == []

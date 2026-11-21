@@ -1,0 +1,15 @@
+{#
+  회사 페이지. 섹션마다 부분 템플릿 하나 — 섹션을 더하려면 `_<섹션>.html` 을 만들고 아래에 include 한 줄.
+  섹션이 쓸 값: `c`(view.CompanyView), `entry`(context.CompanyEntry), `site`, 그리고 @company_context 가 보탠 키.
+#}
+{% extends "base.html" %}
+{% block title %}{{ c.name }} ({{ c.stock_code }}) {{ c.year }} 재무 신호등 · fin-checkup{% endblock %}
+{% block main %}
+<article class="fc-company">
+{% include "company/_summary.html" %}
+{% include "company/_metrics.html" %}
+{% include "company/_red_flags.html" %}
+{% include "company/_changes.html" %}
+{% include "company/_footnote.html" %}
+</article>
+{% endblock %}

@@ -479,6 +479,20 @@ class Cache:
         ).fetchall()
         return [r[0] for r in rows]
 
+    def list_listed_with_statements(
+        self, bsns_year: int, reprt_code: ReportCode = ReportCode.ANNUAL
+    ) -> list[CorpCode]:
+        """상장사 중 해당 연도 보고서가 캐시에 있는 회사, 종목코드순. 정적 사이트가 그리는 모집단이다."""
+        rows = self.conn.execute(
+            "SELECT c.corp_code, c.corp_name, c.stock_code, c.modify_date FROM corp_codes c "
+            "WHERE c.stock_code <> '' AND EXISTS ("
+            "  SELECT 1 FROM statement_lines s WHERE s.corp_code = c.corp_code "
+            "  AND s.bsns_year = ? AND s.reprt_code = ?) "
+            "ORDER BY c.stock_code",
+            [bsns_year, reprt_code.value],
+        ).fetchall()
+        return [CorpCode(**dict(zip(_CORP_FIELDS, r, strict=True))) for r in rows]
+
     # ------------------------------------------------------------------
     # 재무제표 원본 계정
     # ------------------------------------------------------------------

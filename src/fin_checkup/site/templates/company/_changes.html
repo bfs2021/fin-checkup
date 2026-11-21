@@ -1,0 +1,15 @@
+<section class="fc-section" id="changes" aria-labelledby="changes-title">
+  <h2 id="changes-title">작년과 달라진 것</h2>
+  {% if c.changes is none %}
+  <p>직전 사업연도 재무가 없어 비교하지 않았습니다.</p>
+  {% elif c.changes.rows %}
+  <p class="fc-hint">{{ c.changes.prior_year }} → {{ c.changes.latest_year }}년 사이 급격히 나빠진 지표 (등급이 내려갔거나, 같은 등급 안에서 30% 넘게 나쁜 방향으로 움직임)</p>
+  <ul class="fc-changes">
+    {% for ch in c.changes.rows %}
+    <li><b>{{ ch.label }}</b> <span aria-hidden="true">{{ ch.prior.emoji }}→{{ ch.current.emoji }}</span> {{ ch.summary }}</li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p>{{ c.changes.prior_year }} → {{ c.changes.latest_year }}년 사이 급격히 나빠진 지표는 없습니다.</p>
+  {% endif %}
+</section>
