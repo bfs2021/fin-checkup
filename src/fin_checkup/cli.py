@@ -781,7 +781,7 @@ def main(argv: list[str] | None = None) -> int:
     p_site_build.set_defaults(func=cmd_site_build)
 
     p_site_cards = site_sub.add_parser(
-        "cards", help="카드뉴스 PNG (1080×1350, 5~6장) — 만들기만 하고 올리지 않는다"
+        "cards", help="카드뉴스 PNG (1080×1350, 7장 이하) — 만들기만 하고 올리지 않는다"
     )
     p_site_cards.add_argument("stock_code", help="종목코드 6자리")
     p_site_cards.add_argument("--out", required=True, help="PNG 를 쓸 폴더")

@@ -96,12 +96,21 @@ def ellipsize(text: str, font: ImageFont.FreeTypeFont, max_width: float) -> str:
 
 
 def clamp_lines(
-    lines: list[str], font: ImageFont.FreeTypeFont, max_width: float, max_lines: int
+    lines: list[str], font: ImageFont.FreeTypeFont, max_width: float, max_lines: int, more: str = ""
 ) -> list[str]:
+    """max_lines 줄까지만. 잘렸으면 마지막 줄 끝에 '…' — `more` 를 주면 그 글자(예: '… 회사 페이지에서
+    계속')를 붙여 잘렸다는 것과 나머지가 어디 있는지를 말한다."""
     if len(lines) <= max_lines:
         return lines
     kept = lines[:max_lines]
-    kept[-1] = ellipsize(kept[-1] + ELLIPSIS, font, max_width)
+    if not more:
+        kept[-1] = ellipsize(kept[-1] + ELLIPSIS, font, max_width)
+        return kept
+    room = max_width - text_width(more, font)
+    last = kept[-1]
+    while last and text_width(last, font) > room:
+        last = last[:-1]
+    kept[-1] = last.rstrip() + more
     return kept
 
 
@@ -214,12 +223,13 @@ class Canvas:
         fill: str,
         leading: float = 1.45,
         max_lines: int | None = None,
+        more: str = "",
     ) -> float:
-        """여러 줄. 다음에 그릴 y(마지막 줄 아래)를 돌려준다."""
+        """여러 줄. 다음에 그릴 y(마지막 줄 아래)를 돌려준다. 잘릴 때 붙일 글자는 `clamp_lines` 참고."""
         font = self.font(size, bold)
         lines = wrap_text(text, font, max_width)
         if max_lines is not None:
-            lines = clamp_lines(lines, font, max_width, max_lines)
+            lines = clamp_lines(lines, font, max_width, max_lines, more)
         step = line_height(size, leading)
         for i, line in enumerate(lines):
             if line:

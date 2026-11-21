@@ -1,9 +1,10 @@
-"""카드뉴스 — 회사 한 곳의 신호등을 인스타그램 넘김 카드(1080×1350) 5~6장으로.
+"""카드뉴스 — 회사 한 곳의 신호등을 인스타그램 넘김 카드(1080×1350) 7장 이하로.
 
 운영자가 손으로 올리는 용도다. 여기서는 그림만 만들고 어디에도 올리지 않는다 (`docs/card-news.md`).
 
-① 표지 ② 신호등 요약(개수) ③ 수익성 ④ 안정성 ⑤ 현금흐름·이익의 질 ⑥ 읽는 법·출처·사이트 주소.
-지표가 하나도 없는 묶음의 장은 빠진다(그래서 5~6장).
+① 표지 ② 신호등 요약(개수) ③ 수익성 ④ 안정성 ⑤ 현금흐름·이익의 질 ⑥ 성장성·효율성
+⑦ 읽는 법·출처·사이트 주소. 지표가 하나도 없는 묶음의 장은 빠진다.
+요약 장에서 센 지표는 **모두** 어느 장엔가 있다 — 세어 놓고 못 찾는 지표가 없게 (블록을 빼지 않는다).
 
 넘지 않는 선 (REGULATORY.md)
 - 측정값과 계산식·경계값만. 쉬운 말 설명은 `explain.why_color` 그대로 — 새 판정 문장을 만들지 않는다.
@@ -41,12 +42,16 @@ DEFAULT_SITE_URL = "https://younghwan91.github.io/fin-checkup/"
 SOURCE_NAME = "금융감독원 전자공시시스템(DART)"
 TAGLINE = "재무제표 신호등으로 읽기"
 
-#: (묶음, 장 제목, 한 줄 부제). 순서가 장 순서다. 성장성·효율성은 사이트에서 — 카드는 다섯여섯 장으로 짧게.
+#: (묶음, 장 제목, 한 줄 부제). 순서가 장 순서다. 모든 묶음이 어느 장엔가 들어가야 한다 — 요약 장이 17개를
+#: 다 세므로, 빠진 묶음이 있으면 '주의 3개' 중 하나를 독자가 찾지 못한다 (2026-11-21 KB금융 카드).
 SECTIONS: tuple[tuple[tuple[Category, ...], str, str], ...] = (
     ((Category.PROFITABILITY,), "수익성", "매출과 자본에서 이익이 얼마나 남았나"),
     ((Category.STABILITY,), "안정성", "빚과 이자를 감당할 여력"),
     ((Category.EARNINGS_QUALITY,), "현금흐름·이익의 질", "이익이 실제 현금으로 들어왔나"),
+    ((Category.GROWTH, Category.EFFICIENCY), "성장성·효율성", "작년보다 얼마나 늘었나, 자산을 얼마나 돌렸나"),
 )
+#: 설명을 줄 수로 자를 때 붙이는 말 — 잘렸다는 것과 나머지가 어디 있는지.
+MORE = "… 회사 페이지에서 계속"
 
 #: 신호마다 그 뜻 한 줄 — 판정 규칙을 옮긴 말이지 좋다·나쁘다가 아니다.
 SIGNAL_MEANINGS: dict[Signal, str] = {
@@ -94,6 +99,9 @@ class MetricBlock:
     #: 쉬운 말 한두 문장(작년 값 곁들임). 자리가 모자라면 `why_short` 로 바꿔 그린다.
     why: str
     why_short: str
+    #: 자리가 아무리 모자라도 남기는 설명 — ⊘ 의 '대신 볼 것'. 나머지는 빈 문자열
+    #: (신호·값·경계값·계산식은 늘 남는다).
+    why_keep: str = ""
 
 
 @dataclass(frozen=True)
@@ -155,6 +163,7 @@ def _block(metric: Metric, view_value: str, data: Checkup) -> MetricBlock:
         formula=metric.formula,
         why=plain(why_color(metric, delta=data.deltas.get(metric.key), sector=sector, currency=currency)),
         why_short=_short_why(metric, sector, currency),
+        why_keep=_short_why(metric, sector, currency) if _caveat(metric, sector) is not None else "",
     )
 
 
@@ -289,34 +298,59 @@ def draw_summary(canvas: Canvas, deck: CardDeck, page: int, pages: int) -> None:
             canvas.fit_text(x + 26, cy, label, (22, 20, 18), col_w - 26, fill=INK, anchor="lm")
 
 
-#: (블록 머리 글자, 값, 작은 글자, 설명) 크기 — 큰 것부터. 다 넘치면 짧은 설명, 그래도 넘치면 줄 수를 자른다.
-_BLOCK_SCALES: tuple[tuple[int, int, int, int], ...] = (
-    (34, 40, 22, 27),
-    (32, 38, 21, 25),
-    (30, 36, 20, 24),
+@dataclass(frozen=True)
+class Scale:
+    """블록 글자 크기(머리·값·작은 글자·설명)와 블록 사이 간격의 절반."""
+
+    head: int
+    value: int
+    small: int
+    body: int
+    gap: int
+
+
+#: 큰 것부터. 마지막이 최소 — 설명은 바닥글(22) 보다 작게 줄이지 않는다. 최소 크기는 지표 6개 장
+#: (성장성·효율성)에 은행의 ⊘ '대신 볼 것' 세 줄까지 들어가게 맞췄다.
+_SCALES: tuple[Scale, ...] = (
+    Scale(34, 40, 22, 27, 22),
+    Scale(32, 38, 21, 25, 20),
+    Scale(30, 36, 20, 24, 18),
+    Scale(28, 34, 20, 23, 12),
+    Scale(26, 32, 19, 22, 10),
 )
-_BLOCK_GAP = 22
 _WHY_LEADING = 1.42
+_WHY_GAP = 10
+_SMALL_LEADING = 1.4
 
 
-def _block_height(canvas: Canvas, block: MetricBlock, why: str, sizes: tuple[int, int, int, int]) -> float:
-    head, _value, small, body = sizes
-    small_font = canvas.font(small)
+def _why_lines(canvas: Canvas, why: str, scale: Scale) -> int:
+    return len(wrap_text(why, canvas.font(scale.body), CONTENT - 40)) if why else 0
+
+
+def _block_height(
+    canvas: Canvas, block: MetricBlock, why: str, scale: Scale, max_lines: int | None = None
+) -> float:
+    """`_draw_block` 이 실제로 쓰는 높이와 똑같이 잰다 — 재는 식과 그리는 식이 어긋나면 넘치거나 남는다."""
+    small_font = canvas.font(scale.small)
     lines = len(wrap_text(block.band, small_font, CONTENT - 40))
     lines += len(wrap_text(f"계산식: {block.formula}", small_font, CONTENT - 40))
-    if not why:
-        return head * 1.5 + lines * line_height(small, 1.4)
-    why_lines = len(wrap_text(why, canvas.font(body), CONTENT - 40))
-    return head * 1.5 + lines * line_height(small, 1.4) + 10 + why_lines * line_height(body, _WHY_LEADING)
+    height = scale.head * 1.5 + lines * line_height(scale.small, _SMALL_LEADING)
+    why_lines = _why_lines(canvas, why, scale)
+    if max_lines is not None:
+        why_lines = min(why_lines, max_lines)
+    if why_lines:
+        height += _WHY_GAP + why_lines * line_height(scale.body, _WHY_LEADING)
+    return height
 
 
 @dataclass(frozen=True)
 class BlockPlan:
-    sizes: tuple[int, int, int, int]
+    scale: Scale
     whys: list[str]
-    #: 설명 줄 수 상한. None 이면 다 싣는다, 0 이면 설명을 뺀다.
-    max_lines: int | None
-    #: 앞에서부터 그릴 블록 수. 나머지는 '사이트에서' 한 줄로.
+    #: 블록마다 설명 줄 수 상한. None 이면 다 싣는다. 잘리면 끝에 `MORE`.
+    max_lines: list[int | None]
+    #: 앞에서부터 그릴 블록 수. 다 못 그리면 나머지는 '사이트에서' 한 줄로 — 최소 크기에 설명까지 빼고도
+    #: 안 들어갈 때만(실제 공시 문장으로는 일어나지 않는다; 테스트가 실데이터 모양으로 지킨다).
     shown: int
 
 
@@ -324,37 +358,60 @@ _MORE_NOTE_H = 56
 
 
 def _plan_blocks(canvas: Canvas, blocks: tuple[MetricBlock, ...], room: float) -> BlockPlan:
-    """자리가 모자라면 작게 → 짧은 설명 → 설명 줄 수 자르기 → 블록 수 줄이기 순서로 물러선다."""
+    """자리가 모자라면 이 순서로 물러선다.
 
-    def gaps(n: int) -> float:
-        return _BLOCK_GAP * 2 * max(0, n - 1)
+    1. 설명 전체 → 짧은 설명, 각각 큰 글자부터 최소 크기까지 (줄이기가 자르기보다 먼저).
+    2. 최소 크기에서 가장 긴 설명부터 한 줄씩 줄인다 — 잘린 끝엔 `MORE`. ⊘ 의 '대신 볼 것' 은 자르지 않고,
+       다른 설명도 첫 줄은 남긴다.
+    3. 설명을 빼고(⊘ 의 대신 볼 것만 남긴다) 큰 글자부터.
+    4. 그래도 넘치면 뒤에서부터 블록을 뺀다.
 
-    def total(items, whys, sizes) -> float:
-        return sum(_block_height(canvas, b, w, sizes) for b, w in zip(items, whys, strict=True)) + gaps(
-            len(items)
+    예전엔 2 대신 '모든 블록에 같은 줄 수' 를 나눠 줬다. 한 줄짜리 설명이 남긴 자리를 긴 설명이 못 써서
+    ⚫ 설명(세 문장)이 자리가 남는데도 잘렸다 (2026-11-21 KB금융 수익성 장).
+    """
+    n = len(blocks)
+
+    def total(whys, scale: Scale, caps=None, k: int = n) -> float:
+        caps = caps or [None] * k
+        heights = sum(
+            _block_height(canvas, b, w, scale, c) for b, w, c in zip(blocks[:k], whys[:k], caps, strict=True)
         )
+        return heights + scale.gap * 2 * max(0, k - 1)
 
     for pick in (lambda b: b.why, lambda b: b.why_short):
-        for sizes in _BLOCK_SCALES:
-            whys = [pick(b) for b in blocks]
-            if total(blocks, whys, sizes) <= room:
-                return BlockPlan(sizes, whys, None, len(blocks))
-    sizes = _BLOCK_SCALES[-1]
+        whys = [pick(b) for b in blocks]
+        for scale in _SCALES:
+            if total(whys, scale) <= room:
+                return BlockPlan(scale, whys, [None] * n, n)
+
+    scale = _SCALES[-1]
     whys = [b.why_short for b in blocks]
-    line = line_height(sizes[3], _WHY_LEADING)
-    for shown in range(len(blocks), 0, -1):
-        avail = room - (_MORE_NOTE_H if shown < len(blocks) else 0)
-        fixed = total(blocks[:shown], [""] * shown, sizes)
-        if fixed <= avail:
-            per_block = int((avail - fixed) / shown // line)
-            return BlockPlan(sizes, whys, per_block, shown)
-    return BlockPlan(sizes, whys, 0, 1)
+    full = [_why_lines(canvas, w, scale) for w in whys]
+    caps = list(full)
+    floors = [f if b.why_keep else min(f, 1) for b, f in zip(blocks, full, strict=True)]
+    while total(whys, scale, caps) > room:
+        cuttable = [i for i in range(n) if caps[i] > floors[i]]
+        if not cuttable:
+            break
+        caps[max(cuttable, key=lambda i: (caps[i], i))] -= 1
+    else:
+        return BlockPlan(scale, whys, [None if c == f else c for c, f in zip(caps, full, strict=True)], n)
+
+    whys = [b.why_keep for b in blocks]
+    for scale in _SCALES:
+        if total(whys, scale) <= room:
+            return BlockPlan(scale, whys, [None] * n, n)
+    scale = _SCALES[-1]
+    for shown in range(n - 1, 0, -1):
+        if total(whys, scale, k=shown) <= room - _MORE_NOTE_H:
+            return BlockPlan(scale, whys, [None] * n, shown)
+    return BlockPlan(scale, whys, [None] * n, 1)
 
 
 def _draw_block(
-    canvas: Canvas, y: float, block: MetricBlock, why: str, sizes, max_lines: int | None
+    canvas: Canvas, y: float, block: MetricBlock, why: str, scale: Scale, max_lines: int | None
 ) -> float:
-    head, value, small, body = sizes
+    head, value = scale.head, scale.value
     mid = y + head * 0.75
     canvas.signal_mark(MARGIN + 14, mid, 14, block.signal)
     value_w = min(text_width(block.value_text, canvas.font(value, bold=True)), CONTENT * 0.45)
@@ -380,25 +437,36 @@ def _draw_block(
     )
     y += head * 1.5
     x = MARGIN + 40
-    y = canvas.paragraph(x, y, block.band, small, CONTENT - 40, fill=INK_MUTED, leading=1.4)
-    y = canvas.paragraph(x, y, f"계산식: {block.formula}", small, CONTENT - 40, fill=INK_MUTED, leading=1.4)
+    small = scale.small
+    y = canvas.paragraph(x, y, block.band, small, CONTENT - 40, fill=INK_MUTED, leading=_SMALL_LEADING)
+    y = canvas.paragraph(
+        x, y, f"계산식: {block.formula}", small, CONTENT - 40, fill=INK_MUTED, leading=_SMALL_LEADING
+    )
     if max_lines == 0 or not why:
         return y
-    y = canvas.paragraph(
-        x, y + 10, why, body, CONTENT - 40, fill=INK, leading=_WHY_LEADING, max_lines=max_lines
+    return canvas.paragraph(
+        x,
+        y + _WHY_GAP,
+        why,
+        scale.body,
+        CONTENT - 40,
+        fill=INK,
+        leading=_WHY_LEADING,
+        max_lines=max_lines,
+        more=MORE,
     )
-    return y
 
 
 def draw_section(canvas: Canvas, deck: CardDeck, section: Section, page: int, pages: int) -> None:
     top, bottom = _frame(canvas, deck, page, pages)
     y = _title(canvas, top, section.title, section.subtitle)
     plan = _plan_blocks(canvas, section.blocks, bottom - y)
+    gap = plan.scale.gap
     for i in range(plan.shown):
         if i:
-            canvas.line(MARGIN, y + _BLOCK_GAP, WIDTH - MARGIN, y + _BLOCK_GAP, fill=BORDER, width=1)
-            y += _BLOCK_GAP * 2
-        y = _draw_block(canvas, y, section.blocks[i], plan.whys[i], plan.sizes, plan.max_lines)
+            canvas.line(MARGIN, y + gap, WIDTH - MARGIN, y + gap, fill=BORDER, width=1)
+            y += gap * 2
+        y = _draw_block(canvas, y, section.blocks[i], plan.whys[i], plan.scale, plan.max_lines[i])
     rest = len(section.blocks) - plan.shown
     if rest:
         canvas.text(MARGIN, y + 20, f"나머지 지표 {rest}개는 사이트에서 볼 수 있어요.", 24, fill=INK_MUTED)
