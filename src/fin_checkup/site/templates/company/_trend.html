@@ -1,0 +1,27 @@
+{# 5개년 추이 — 그림은 charts.trend_svg (인라인 SVG, JS 없음). 같은 값을 아래 표로 한 번 더 싣는다. #}
+<section class="fc-section" id="trend" aria-labelledby="trend-title">
+  <h2 id="trend-title">{{ trend_years | length }}개년 추이</h2>
+  <p class="fc-hint">칸마다 세로축이 다릅니다. 값이 없는 해는 0으로 그리지 않고 <span aria-hidden="true">⚫</span> 데이터 없음으로 비워 둡니다{% if trend_years %} ({{ trend_years[0] }}–{{ trend_years[-1] }}){% endif %}.</p>
+  <div class="fc-trend-grid">
+    {% for panel in trend_panels %}
+    <figure class="fc-trend">
+      <figcaption><b>{{ panel.series.label }}</b> <span class="fc-trend-unit">{{ panel.scale_note }}</span></figcaption>
+      {{ panel.svg }}
+    </figure>
+    {% endfor %}
+  </div>
+  <details class="fc-table-view">
+    <summary>표로 보기</summary>
+    <div class="fc-table-scroll">
+    <table>
+      <thead><tr><th scope="col">항목</th>{% for year in trend_years %}<th scope="col">{{ year }}</th>{% endfor %}</tr></thead>
+      <tbody>
+      {% for panel in trend_panels %}
+        <tr><th scope="row">{{ panel.series.label }}</th>{% for p in panel.series.points %}<td{% if p.gap %} class="muted" title="{{ p.gap.reason }}"{% endif %}>{{ p.text }}</td>{% endfor %}</tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    <p class="fc-hint">⚫ 데이터 없음: 그 해 재무가 아직 수집되지 않았거나 공시에서 계정을 찾지 못한 경우. ⊘ 해당 없음: 이 업종에는 뜻이 없는 지표.</p>
+  </details>
+</section>
