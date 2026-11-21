@@ -59,7 +59,7 @@
     <h3><a href="{{ url(home) }}#changes">작년과 달라진 것</a></h3>
     <p>작년과 견줘 등급이 내려갔거나, 같은 등급 안에서도 크게 움직인 지표를 모아 둬요.</p>
 
-    <h3><a href="{{ url(home) }}#same-sector">같은 업종 회사</a></h3>
+    <h3>{% if fr.has_same_sector %}<a href="{{ url(home) }}#same-sector">같은 업종 회사</a>{% else %}같은 업종 회사{% endif %}</h3>
     <p>같은 업종의 다른 회사로 건너갈 수 있어요. 지표 값이 아니라 이름순으로 이웃한 회사들이에요. 업종 전체의 지표 분포는 <a href="{{ url('s/') }}">업종 페이지</a>에 있어요.</p>
   </section>
 
