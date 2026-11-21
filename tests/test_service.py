@@ -151,11 +151,12 @@ async def test_ensure_corp_codes_skips_when_fresh(service, cache):
 # ── 업종 비교 ─────────────────────────────────────────────────────
 
 
-def _company(corp_code: str, industry: str = "264"):
-    from fin_checkup.models import Company
+def _company(corp_code: str, industry: str = "264", market=None):
+    from fin_checkup.models import Company, Market
 
     return Company(corp_code=corp_code, corp_name=f"회사{corp_code}",
-                   stock_code=corp_code.zfill(6), industry_code=industry)
+                   stock_code=corp_code.zfill(6), industry_code=industry,
+                   market=market or Market.KOSPI)
 
 
 def _seed_industry(cache, count: int, industry: str = "264") -> None:
@@ -185,6 +186,28 @@ async def test_peer_comparison_is_built_with_enough_peers(service, cache):
         result = await service.run(SAMSUNG, end_year=2024, allow_fetch=False)
     assert result is not None
     assert "debt_ratio" in result.peers
+    assert result.peers["debt_ratio"].sample_size == 6
+
+
+async def test_unlisted_companies_are_not_counted_as_peers(service, cache):
+    """'동종업계 상장사' 라고 적으면서 상장폐지·비상장 회사(market OTHER)를 세면 안 된다.
+
+    실데이터 2024년에 재무가 있는 회사의 8%(217곳)가 OTHER 였다 — 업종·시장 대조군 둘 다에 섞였다.
+    """
+    from fin_checkup.models import Market
+
+    cache.save_company(_company("00126380"))
+    _seed_industry(cache, 6)
+    for i in range(4):
+        code = f"9500000{i}"
+        cache.save_company(_company(code, market=Market.OTHER))
+        raw = statements(2024, 5000.0 + i)
+        raw.corp_code = code
+        cache.save_statements(raw)
+    cache.save_statements(statements(2024, 1000.0))
+    with respx.mock:
+        result = await service.run(SAMSUNG, end_year=2024, allow_fetch=False)
+    assert result is not None
     assert result.peers["debt_ratio"].sample_size == 6
 
 

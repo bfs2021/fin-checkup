@@ -11,6 +11,7 @@ import duckdb
 
 from fin_checkup.clock import kst_today
 from fin_checkup.models import (
+    LISTED_MARKETS,
     AccountLine,
     Company,
     CorpCode,
@@ -21,6 +22,10 @@ from fin_checkup.models import (
 )
 
 logger = logging.getLogger(__name__)
+
+#: `companies.market` 이 상장 시장인지. 앞에 테이블 별칭을 붙여 쓸 수 있게 `market` 으로 시작한다.
+#: 값은 코드 상수(Market)라 SQL 에 그대로 넣어도 된다.
+_LISTED_SQL = "market IN ({})".format(", ".join(f"'{m.value}'" for m in LISTED_MARKETS))
 
 
 def today_key(when: date | None = None) -> str:
@@ -380,7 +385,7 @@ class Cache:
         )
 
     def list_by_industry(self, industry_prefix: str) -> list[str]:
-        """업종 그룹에 속한 기업의 corp_code 목록.
+        """업종 그룹에 속한 **상장** 기업의 corp_code 목록 (동종업계 대조군).
 
         접두사로 찾는다 — 5자리 원본 코드로 정확히 맞추면 업종이 318개로 쪼개져
         절반이 비교 표본을 못 채운다(실측).
@@ -389,7 +394,8 @@ class Cache:
         if not prefix:
             return []
         rows = self.conn.execute(
-            "SELECT corp_code FROM companies WHERE industry_code LIKE ? ORDER BY corp_code",
+            f"SELECT corp_code FROM companies WHERE industry_code LIKE ? AND {_LISTED_SQL} "
+            "ORDER BY corp_code",
             [f"{prefix}%"],
         ).fetchall()
         return [r[0] for r in rows]
@@ -478,11 +484,21 @@ class Cache:
         ).fetchone()
         return int(row[0]) if row else 0
 
-    def list_with_statements(self, bsns_year: int, limit: int = 2000) -> list[str]:
-        """해당 연도 재무가 캐시에 있는 기업. 시장 전체 대조군의 모집단이다."""
+    def list_with_statements(
+        self, bsns_year: int, limit: int = 2000, listed_only: bool = True
+    ) -> list[str]:
+        """해당 연도 재무가 캐시에 있는 기업. 시장 전체 대조군('전체 상장사')의 모집단이다.
+
+        `listed_only=False` 는 지표 미리 계산(backfill)용 — 상장 여부와 무관하게 재무가 있는 전부.
+        """
+        listed = (
+            f"AND corp_code IN (SELECT corp_code FROM companies WHERE {_LISTED_SQL}) "
+            if listed_only
+            else ""
+        )
         rows = self.conn.execute(
             "SELECT DISTINCT corp_code FROM statement_lines WHERE bsns_year = ? "
-            "ORDER BY corp_code LIMIT ?",
+            f"{listed}ORDER BY corp_code LIMIT ?",
             [bsns_year, limit],
         ).fetchall()
         return [r[0] for r in rows]
@@ -490,10 +506,15 @@ class Cache:
     def list_listed_with_statements(
         self, bsns_year: int, reprt_code: ReportCode = ReportCode.ANNUAL
     ) -> list[CorpCode]:
-        """상장사 중 해당 연도 보고서가 캐시에 있는 회사, 종목코드순. 정적 사이트가 그리는 모집단이다."""
+        """상장사 중 해당 연도 보고서가 캐시에 있는 회사, 종목코드순. 정적 사이트가 그리는 모집단이다.
+
+        종목코드만으로는 상장사를 가를 수 없다 — corpCode.xml 은 상장폐지 회사의 옛 코드를 남긴다.
+        시장 구분(`companies.market`)이 KOSPI·KOSDAQ·KONEX 인 회사만. 모르면 넣지 않는다.
+        """
         rows = self.conn.execute(
             "SELECT c.corp_code, c.corp_name, c.stock_code, c.modify_date FROM corp_codes c "
-            "WHERE c.stock_code <> '' AND EXISTS ("
+            "JOIN companies co ON co.corp_code = c.corp_code "
+            f"WHERE c.stock_code <> '' AND co.{_LISTED_SQL} AND EXISTS ("
             "  SELECT 1 FROM statement_lines s WHERE s.corp_code = c.corp_code "
             "  AND s.bsns_year = ? AND s.reprt_code = ?) "
             "ORDER BY c.stock_code",

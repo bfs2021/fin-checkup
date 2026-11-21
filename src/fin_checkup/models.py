@@ -54,6 +54,10 @@ CORP_CLS_TO_MARKET: dict[str, Market] = {
     "E": Market.OTHER,
 }
 
+#: 지금 거래소에 상장된 시장. `OTHER`(DART corp_cls 'E')는 종목코드가 남아 있어도
+#: 상장사가 아니다 — 상장폐지·비상장 전환 회사의 옛 코드다(신한은행 000010 등).
+LISTED_MARKETS: tuple[Market, ...] = (Market.KOSPI, Market.KOSDAQ, Market.KONEX)
+
 
 class CorpCode(BaseModel):
     """DART 고유번호 매핑 한 건 (corpCode.xml)."""
