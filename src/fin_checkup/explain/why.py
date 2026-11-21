@@ -13,7 +13,13 @@ from __future__ import annotations
 from fin_checkup.explain._korean import because, is_, topic
 from fin_checkup.explain.metrics import band_ranges, get_explainer
 from fin_checkup.format import format_metric, format_money
-from fin_checkup.metrics.engine import MISSING_ACCOUNT_NOTE, MONEY, Category, Metric
+from fin_checkup.metrics.engine import (
+    INTEREST_PAID_NOTE,
+    MISSING_ACCOUNT_NOTE,
+    MONEY,
+    Category,
+    Metric,
+)
 from fin_checkup.metrics.peers import PeerStat, SelfDelta
 from fin_checkup.metrics.sector import Sector
 from fin_checkup.metrics.signals import Signal
@@ -52,6 +58,12 @@ def why_color(
     value = format_metric(metric, currency)
     context = _context(peer_stat, delta, currency)
 
+    if metric.proxy:
+        # 경계값은 있는데 분모가 대체값이라 판정하지 않았다. '업종 편차' 문장을 쓰면 이유가 거짓이 된다.
+        rule = next((r for r in explainer.special_rules if r.signal is Signal.NEUTRAL), None)
+        reason = rule.fact if rule else metric.note
+        return f"{name} {topic(value)} {signal.emoji} {is_(signal.label)} — {reason}"
+
     if signal is Signal.NEUTRAL or metric.band is None:
         return f"{name} {topic(value)} 업종마다 차이가 커서 경계값 없이 ⚪ 측정값으로만 보여 줘요{context}."
 
@@ -61,6 +73,10 @@ def why_color(
         # 경계값과 다른 색을 규칙이 정했다. 엔진이 남긴 메모가 이유다.
         return f"{name} {topic(value)} {signal.emoji} {is_(signal.label)} — {metric.note}{context}"
     sentence = f"{name} {topic(value)} {because(band_phrase)} {signal.emoji} {is_(signal.label)}{context}."
+    # 분모의 출처 비고(이자 지급액 기준)는 규칙이 아니라 계산 근거다. 그대로 붙인다 — 같은 색의
+    # 규칙(무차입 🟢)을 대신 붙이면 이자를 내는 회사를 '빚이 없다' 고 적게 된다.
+    if INTEREST_PAID_NOTE in metric.note:
+        return f"{sentence} {INTEREST_PAID_NOTE}"
     # 경계값과 같은 색이어도 규칙이 따로 짚은 사실이 있으면 덧붙인다 (흑자인데 현금 유출).
     rule = next((r for r in explainer.special_rules if r.signal is signal), None)
     if rule is not None and metric.note:

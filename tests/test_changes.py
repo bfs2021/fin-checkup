@@ -81,3 +81,14 @@ def test_not_applicable_metric_is_never_reported_as_a_change():
     prior = checkup(fin(2023, total_liabilities=12000, total_equity=1000), sector=Sector.FINANCIAL)
     current = checkup(fin(2024, total_liabilities=8000, total_equity=1000), sector=Sector.FINANCIAL)
     assert "debt_ratio" not in keys(detect_changes(current, prior))
+
+
+def test_no_move_is_reported_against_a_finance_cost_proxy_year():
+    # 작년은 이자 지급액(40배), 올해는 금융원가 대체값(2.5배). 분모가 달라 '94% 악화' 는 거짓이다.
+    from fin_checkup.models import InterestSource
+
+    prior = checkup(fin(2023, operating_income=400, interest_expense=10,
+                        interest_expense_source=InterestSource.CASH_FLOW))
+    current = checkup(fin(2024, operating_income=400, interest_expense=160,
+                          interest_expense_source=InterestSource.FINANCE_COSTS))
+    assert "interest_coverage" not in keys(detect_changes(current, prior))

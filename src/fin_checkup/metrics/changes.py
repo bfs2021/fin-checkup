@@ -57,6 +57,9 @@ def detect_changes(
         # ⊘ 는 "이 업종엔 판정하지 않는다" 다. 경계값이 없어 방향도 없다 — 급변이라 부를 근거가 없다.
         if Signal.NOT_APPLICABLE in (metric.signal, before.signal):
             continue
+        # 대체 계정으로 낸 값은 분모가 다르다(이자 지급 40배 → 금융원가 2.5배). 움직임이 아니다.
+        if metric.proxy or before.proxy:
+            continue
 
         downgraded = SEVERITY[metric.signal] > SEVERITY[before.signal] and {
             metric.signal,

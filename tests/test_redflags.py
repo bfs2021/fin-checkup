@@ -113,3 +113,26 @@ def test_detail_uses_the_filing_currency():
     krw = [fin(2024, total_equity=-100, capital_stock=500)]
     flag = next(f for f in detect_red_flags(krw) if f.key == "full_capital_impairment")
     assert "원" in flag.detail
+
+
+def test_zombie_streak_does_not_fire_on_finance_cost_proxy():
+    # 금융원가에는 외환손실이 섞인다. 그걸로 '3년 연속 이자도 못 갚음' 을 단정하지 않는다.
+    from fin_checkup.models import InterestSource
+
+    history = [
+        fin(y, operating_income=5, interest_expense=100,
+            interest_expense_source=InterestSource.FINANCE_COSTS)
+        for y in (2022, 2023, 2024)
+    ]
+    assert "zombie_streak" not in keys(detect_red_flags(history))
+
+
+def test_zombie_streak_fires_on_cash_flow_interest_paid():
+    from fin_checkup.models import InterestSource
+
+    history = [
+        fin(y, operating_income=5, interest_expense=100,
+            interest_expense_source=InterestSource.CASH_FLOW)
+        for y in (2022, 2023, 2024)
+    ]
+    assert "zombie_streak" in keys(detect_red_flags(history))

@@ -194,6 +194,18 @@ def test_checkup_returns_metrics_and_bands(client, api_key):
     assert debt["higher_is_better"] is False
 
 
+def test_interest_coverage_source_note_reaches_the_api(client, cache, api_key):
+    """금융원가 대체값은 ⚪ 와 그 이유가 응답에 같이 나가야 한다 — 값만 나가면 이자로 읽힌다."""
+    raw = statements(SAMSUNG.corp_code, 2024, 1200.0)
+    raw.lines.append(AccountLine(sj_div="IS", account_id="ifrs-full_FinanceCosts",
+                                 account_nm="금융비용", thstrm_amount=200.0, ord=7))
+    cache.save_statements(raw)
+    body = client.get("/checkup/005930", params={"year": 2024}, headers=auth(api_key)).json()
+    ic = next(m for m in body["metrics"] if m["key"] == "interest_coverage")
+    assert ic["signal"] == "neutral"
+    assert "금융원가" in ic["note"] and "판정하지 않음" in ic["note"]
+
+
 def test_checkup_response_always_carries_the_disclaimer(client, api_key):
     body = client.get("/checkup/005930", headers=auth(api_key)).json()
     assert "투자권유" in body["disclaimer"]

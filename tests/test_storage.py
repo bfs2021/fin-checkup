@@ -315,3 +315,24 @@ def test_listed_with_statements_is_the_site_build_population(cache: Cache):
     listed = cache.list_listed_with_statements(2024)
     assert [c.stock_code for c in listed] == ["000660", "005930"]
     assert cache.list_listed_with_statements(2023) == []
+
+
+def test_reopening_purges_interest_coverage_computed_from_finance_costs(tmp_path):
+    """옛 규칙은 상장사 94% 의 이자보상배율을 금융원가로 냈다. 그 값이 대조군에 남아
+    있으면 고친 판정을 옛 분포에 견주게 된다 — 다시 열 때 지우고 backfill 로 다시 채운다."""
+    from fin_checkup.storage.db import _MIGRATION_INTEREST_SOURCE
+
+    path = tmp_path / "m.duckdb"
+    with Cache(path) as c:
+        c.conn.execute("DELETE FROM meta WHERE key = ?", [_MIGRATION_INTEREST_SOURCE])
+        c.save_metric_values("A", 2024, {"interest_coverage": 2.5, "roe": 10.0})
+
+    with Cache(path) as c:
+        values = c.peer_metric_values(["A"], 2024)
+        assert "interest_coverage" not in values
+        assert values["roe"] == [10.0]
+        assert c.get_meta(_MIGRATION_INTEREST_SOURCE) == "done"
+        c.save_metric_values("A", 2024, {"interest_coverage": 48.0})
+
+    with Cache(path) as c:
+        assert c.peer_metric_values(["A"], 2024)["interest_coverage"] == [48.0], "한 번만 돈다"

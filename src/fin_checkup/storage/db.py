@@ -164,6 +164,9 @@ BULK_CHUNK = 2000
 #: (metrics.engine 의 MONEY 지표와 같아야 한다. storage 가 metrics 를 import 하지 않으려고 적어둔다.)
 _MONEY_METRIC_KEYS = ("operating_cash_flow", "fcf")
 _MIGRATION_FOREIGN_MONEY = "migrations.metric_values_foreign_money"
+#: 이자보상배율은 2026-11 까지 이자비용이 없으면 금융원가로 계산돼 대조군에 들어갔다(2024 상장사 94%).
+#: 이제 금융원가 대체값은 대조군에서 빠지므로 옛 값을 지우고 `cli backfill` 로 다시 채운다.
+_MIGRATION_INTEREST_SOURCE = "migrations.metric_values_interest_source"
 
 
 class CacheLocked(RuntimeError):
@@ -258,6 +261,11 @@ class Cache:
                 list(_MONEY_METRIC_KEYS),
             )
             self.set_meta(_MIGRATION_FOREIGN_MONEY, "done")
+        if self.get_meta(_MIGRATION_INTEREST_SOURCE) is None:
+            # 옛 값 대부분이 외환손실 섞인 금융원가 기준이다. 남겨 두면 고친 값을 옛 분포에 견준다.
+            # 지운 뒤 backfill 전까지는 이 지표의 대조군이 비어 있다(틀린 분포보다 낫다).
+            self.conn.execute("DELETE FROM metric_values WHERE metric_key = 'interest_coverage'")
+            self.set_meta(_MIGRATION_INTEREST_SOURCE, "done")
 
     def __enter__(self) -> Cache:
         return self

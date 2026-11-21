@@ -345,3 +345,60 @@ async def test_self_comparison_skips_not_applicable_metrics(service, cache):
     assert result.result.by_key("debt_ratio").signal.value == "not_applicable"
     assert "debt_ratio" not in result.deltas
     assert "operating_margin" in result.deltas, "판정하는 지표의 작년 대비는 그대로 둔다"
+
+
+# ── 금융원가 대체값은 대조군에 섞지 않는다 ─────────────────────────────
+
+
+def _with_finance_costs_only(year: int, revenue: float) -> RawStatements:
+    raw = statements(year, revenue)
+    raw.lines.append(AccountLine(sj_div="IS", account_id="ifrs-full_FinanceCosts",
+                                 account_nm="금융원가", thstrm_amount=revenue, ord=6))
+    return raw
+
+
+def _with_interest_paid(year: int, revenue: float) -> RawStatements:
+    raw = _with_finance_costs_only(year, revenue)
+    raw.lines.append(AccountLine(
+        sj_div="CF", account_id="ifrs-full_InterestPaidClassifiedAsOperatingActivities",
+        account_nm="이자의 지급", thstrm_amount=revenue * 0.01, ord=7,
+    ))
+    return raw
+
+
+async def test_backfill_leaves_finance_cost_proxy_out_of_peer_values(service, cache):
+    """금융원가로 낸 이자보상배율은 외환손실 크기에 따라 출렁인다. 분포에 넣으면
+    이자 지급액 기준 회사의 백분위가 엉뚱해진다."""
+    cache.save_company(_company("00126380"))
+    cache.save_statements(_with_finance_costs_only(2024, 1000.0))
+    paid = _with_interest_paid(2024, 1000.0)
+    paid.corp_code = "90000009"
+    cache.save_company(_company("90000009"))
+    cache.save_statements(paid)
+
+    service.backfill_metric_values(2024)
+
+    rows = dict(cache.conn.execute(
+        "SELECT corp_code, value FROM metric_values WHERE metric_key = 'interest_coverage'"
+    ).fetchall())
+    assert "00126380" not in rows, "대체값이 대조군에 들어갔다"
+    assert rows["90000009"] == pytest.approx(10.0)
+
+
+async def test_proxy_metric_gets_no_peer_rank_or_self_delta(service, cache):
+    cache.save_company(_company("00126380"))
+    for i in range(6):
+        code = f"9000000{i}"
+        cache.save_company(_company(code))
+        peer = _with_interest_paid(2024, 1000.0 + i * 100)
+        peer.corp_code = code
+        cache.save_statements(peer)
+    cache.save_statements(_with_interest_paid(2023, 1000.0))
+    cache.save_statements(_with_finance_costs_only(2024, 1000.0))
+    with respx.mock:
+        result = await service.run(SAMSUNG, end_year=2024, allow_fetch=False)
+    assert result is not None
+    m = result.result.by_key("interest_coverage")
+    assert m.proxy is True
+    assert "interest_coverage" not in result.peers
+    assert "interest_coverage" not in result.deltas, "작년(이자 지급)과 올해(금융원가)는 분모가 다르다"

@@ -219,11 +219,12 @@ class CheckupService:
         if prior is None:
             return {}
 
-        previous = {m.key: m.value for m in checkup(prior, sector=sector).metrics}
+        # 대체 계정으로 낸 값(금융원가 이자보상배율)은 견주지 않는다 — 분모가 다른 값끼리다.
+        previous = {m.key: m.value for m in checkup(prior, sector=sector).metrics if not m.proxy}
         deltas: dict[str, SelfDelta] = {}
         for metric in result.metrics:
             # ⊘ 지표에 "개선/악화" 를 붙이면 판정하지 않겠다던 지표를 판정하게 된다.
-            if metric.signal is Signal.NOT_APPLICABLE:
+            if metric.signal is Signal.NOT_APPLICABLE or metric.proxy:
                 continue
             delta = self_delta(metric, previous.get(metric.key), currency=result.currency)
             if delta is not None:
@@ -357,7 +358,13 @@ class CheckupService:
 
 
 def _comparable(metric, currency: str) -> bool:
-    """비율은 통화와 무관하다. 금액 지표는 대조군(원화)과 같은 통화일 때만 견준다."""
+    """비율은 통화와 무관하다. 금액 지표는 대조군(원화)과 같은 통화일 때만 견준다.
+
+    대체 계정으로 낸 값(금융원가 이자보상배율)은 대조군에 넣지도, 대조군에 견주지도 않는다.
+    2024 상장사 94% 가 금융원가로 계산되던 때의 분포는 외환손실 크기의 분포였다.
+    """
+    if metric.proxy:
+        return False
     return metric.unit != MONEY or currency == "KRW"
 
 

@@ -7,11 +7,12 @@ DART는 기업마다 계정 표기가 제각각이다. 표준 XBRL 태그(accoun
 
 from __future__ import annotations
 
+import re
 from collections import Counter
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 
-from fin_checkup.models import AccountLine, Financials, RawStatements
+from fin_checkup.models import AccountLine, Financials, InterestSource, RawStatements
 
 BS = frozenset({"BS"})
 INCOME = frozenset({"IS", "CIS"})
@@ -107,11 +108,11 @@ FIELD_SPECS: tuple[FieldSpec, ...] = (
             "반기순이익", "분기순이익",
         ),
     ),
+    # 이자비용은 단독 계정만 여기서 찾는다. 없을 때의 대체 순서는 _interest_expense 가 맡는다.
     FieldSpec(
         "interest_expense", INCOME,
         account_ids=("ifrs-full_InterestExpense", "dart_InterestExpense"),
-        # 이자비용 단독 표기가 없으면 금융원가로 대체한다(과대 추정 가능 — UI에서 표기).
-        account_names=("이자비용", "금융원가", "금융비용"),
+        account_names=("이자비용",),
         absolute=True,
     ),
     # ── 현금흐름표 ──────────────────────────────────────────────
@@ -142,6 +143,34 @@ FIELD_SPECS: tuple[FieldSpec, ...] = (
 )
 
 
+#: 금융원가 — 이자비용 단독 계정도, 현금흐름표 이자 지급도 없을 때의 마지막 대체값.
+#: 외환·파생 손실이 섞여 이자보다 크다(판정하지 않는다 — metrics.engine).
+FINANCE_COSTS = FieldSpec(
+    "finance_costs", INCOME,
+    account_ids=("ifrs-full_FinanceCosts",),
+    account_names=("금융원가", "금융비용"),
+    absolute=True,
+)
+
+#: 현금흐름표의 이자 지급. 영업·투자(자본화 이자)·재무로 나눠 적는 회사가 있어 합산한다.
+INTEREST_PAID_IDS: tuple[str, ...] = (
+    "ifrs-full_InterestPaidClassifiedAsOperatingActivities",
+    "ifrs-full_InterestPaidClassifiedAsInvestingActivities",
+    "ifrs-full_InterestPaidClassifiedAsFinancingActivities",
+    "ifrs-full_InterestPaid",
+)
+#: 표준 태그가 없을 때의 이름(공백·앞 번호 제거 뒤 완전일치). 간접법의 '이자비용 조정'은
+#: 현금 지급이 아니라 걸리지 않게 '지급'·'납부'가 든 이름만 둔다.
+INTEREST_PAID_NAMES: tuple[str, ...] = (
+    "이자의지급", "이자지급", "이자지급(영업)", "이자의지급(영업)", "이자지급액",
+    "이자비용의지급", "이자비용지급", "이자비용지급액", "이자의납부", "이자납부",
+)
+#: 신종자본증권은 자본이라 그 '이자'는 분배다. 이자 지급 태그가 붙어 있어도 뺀다.
+_NOT_INTEREST = ("신종자본", "혼성자본")
+#: '3. 이자의 지급', '(3) 이자지급', '３.이자의지급' 의 앞 번호.
+_NUMBERING = re.compile(r"^[(（]?[0-9０-９]+[.)．）]")
+
+
 def _key(text: str) -> str:
     """공백을 제거해 표기 흔들림('매출채권 및 기타유동채권')을 흡수한다."""
     return "".join(text.split())
@@ -167,6 +196,42 @@ def _find(lines: Iterable[AccountLine], spec: FieldSpec) -> float | None:
     return None
 
 
+def _interest_paid(lines: Iterable[AccountLine]) -> float | None:
+    """현금흐름표 이자 지급액(절댓값). 표준 태그 줄은 활동별로 합하고, 없으면 이름으로 한 줄."""
+    candidates = [
+        ln for ln in lines
+        if ln.sj_div in CF and ln.thstrm_amount is not None
+        and not any(word in _key(ln.account_nm) for word in _NOT_INTEREST)
+    ]
+    by_id: dict[str, float] = {}
+    for ln in candidates:
+        if ln.account_id in INTEREST_PAID_IDS:
+            by_id.setdefault(ln.account_id, abs(ln.thstrm_amount))  # type: ignore[arg-type]
+    if by_id:
+        return sum(by_id.values())
+    by_name: dict[str, float] = {}
+    for ln in candidates:
+        by_name.setdefault(_NUMBERING.sub("", _key(ln.account_nm)), abs(ln.thstrm_amount))  # type: ignore[arg-type]
+    return next((by_name[n] for n in INTEREST_PAID_NAMES if n in by_name), None)
+
+
+def _interest_expense(
+    lines: list[AccountLine], standalone: float | None
+) -> tuple[float | None, InterestSource | None]:
+    """이자비용과 그 출처: 손익계산서 이자비용 → 현금흐름표 이자 지급 → 금융원가.
+
+    현금 지급이 0 이면 금융원가로 내려간다. 지급 0 은 무차입의 증거가 아니다 — 전환사채
+    상각이자처럼 비용은 났는데 현금은 안 나간 이자가 흔하다.
+    """
+    if standalone is not None:
+        return standalone, InterestSource.INCOME_STATEMENT
+    if (paid := _interest_paid(lines)) is not None and paid > 0:
+        return paid, InterestSource.CASH_FLOW
+    if (proxy := _find(lines, FINANCE_COSTS)) is not None:
+        return proxy, InterestSource.FINANCE_COSTS
+    return None, None
+
+
 def _currency_of(lines: Iterable[AccountLine]) -> str:
     """계정 줄의 통화 최빈값. DART 에 USD·JPY·CNY 로 공시하는 기업이 24곳 있다 —
     KRW 로 두면 두산밥캣 자산 82억달러가 '82억원'으로 찍힌다."""
@@ -177,11 +242,13 @@ def _currency_of(lines: Iterable[AccountLine]) -> str:
 def normalize_statements(raw: RawStatements) -> Financials:
     """원본 계정 줄 → 지표 계산용 Financials."""
     values = {spec.name: _find(raw.lines, spec) for spec in FIELD_SPECS}
+    values["interest_expense"], source = _interest_expense(raw.lines, values["interest_expense"])
     return Financials(
         corp_code=raw.corp_code,
         bsns_year=raw.bsns_year,
         reprt_code=raw.reprt_code,
         fs_div=raw.fs_div,
         currency=_currency_of(raw.lines),
+        interest_expense_source=source,
         **values,
     )
