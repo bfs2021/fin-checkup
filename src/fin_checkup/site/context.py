@@ -28,6 +28,7 @@ from fin_checkup.site.season import SeasonView, season_view
 if TYPE_CHECKING:
     from fin_checkup.site.buildinfo import SnapshotInfo
     from fin_checkup.site.disclosures import DisclosureFeed
+    from fin_checkup.site.incremental import BuildCache
 
 
 @dataclass(frozen=True)
@@ -105,6 +106,8 @@ class Site:
     disclosures: DisclosureFeed | None = None
     #: 스냅샷 manifest (`site build --snapshot`). 꼬리의 데이터 기준 줄에 날짜를 적는다.
     snapshot: SnapshotInfo | None = None
+    #: 증분 빌드 캐시 (`site build --incremental`). 비싼 산출물(공유 카드 PNG)이 내용 열쇠로 재사용한다.
+    build_cache: BuildCache | None = None
 
     def __post_init__(self) -> None:
         if not self.base_url.endswith("/"):

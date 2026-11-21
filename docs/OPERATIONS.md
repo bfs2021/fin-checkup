@@ -288,6 +288,11 @@ uv run python -m http.server -d site-out 8080                            # http:
 - 출력 폴더는 빌드마다 통째로 비운다. 비어 있지 않은 폴더는 빌드 표식(`.fin-checkup-site`)이 있을 때만 비우고,
   없으면 멈춘다 — 엉뚱한 폴더를 지우지 않게.
 - canonical·sitemap 같은 절대주소는 `--base-url https://…` 를 줄 때만 나온다. 페이지 사이 링크는 상대경로라 무관하다.
+- 빠르게: `--jobs N` 은 건강검진 계산을 프로세스 N 개로 나눈다(DB 를 읽기 전용으로 여는 `site build` 에서만).
+  `--incremental <폴더>` 는 코드·데이터가 같은 건강검진과 공유 카드 PNG 를 다시 만들지 않는다 — 열쇠는 패키지
+  소스 전체 해시 + 데이터 테이블 내용 해시(+ PNG 는 카드 내용)라 하나라도 바뀌면 다시 만든다
+  (`site/incremental.py`). 2026-11-21 실측(2,542곳·16코어): 기본 87초 → `--jobs 8` 55초 → 같은 캐시로 다시 9초.
+  `pages.yml` 은 `--jobs $(nproc) --incremental _build-cache` 에 actions/cache 로 폴더를 이어 쓴다.
 
 ### 검색 엔진에 사이트 알리기 (sitemap)
 

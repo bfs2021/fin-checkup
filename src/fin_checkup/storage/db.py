@@ -535,6 +535,28 @@ class Cache:
         ).fetchall()
         return [CorpCode(**dict(zip(_CORP_FIELDS, r, strict=True))) for r in rows]
 
+    def table_fingerprint(self, table: str) -> tuple[int, str]:
+        """(행 수, 행 내용 해시의 합) — 증분 사이트 빌드의 데이터 지문 (`site/incremental.py`).
+
+        행 순서와 무관하고, 스냅샷을 다시 들여와도 내용이 같으면 같다. `fetched_at` 은 받아 온 시각이지
+        내용이 아니라 뺀다 — 같은 공시를 다시 받았다고 캐시 전체가 무효가 되지 않게.
+        """
+        if table not in _FINGERPRINT_TABLES:
+            raise ValueError(f"지문을 내지 않는 테이블: {table}")
+        columns = [
+            name
+            for (name,) in self.conn.execute(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_name = ? ORDER BY ordinal_position",
+                [table],
+            ).fetchall()
+            if name != "fetched_at"
+        ]
+        rows, total = self.conn.execute(
+            f"SELECT count(*), coalesce(sum(hash({', '.join(columns)})), 0) FROM {table}"
+        ).fetchone()
+        return int(rows), str(total)
+
     # ------------------------------------------------------------------
     # 재무제표 원본 계정
     # ------------------------------------------------------------------
@@ -836,6 +858,10 @@ class Cache:
         self.conn.execute(
             "INSERT INTO notified VALUES (?, ?, ?)", [chat_id, rcept_no, datetime.now()]
         )
+
+
+#: `table_fingerprint` 를 낼 수 있는 테이블 — 건강검진이 읽는 공개 데이터만 (SQL 에 이름이 들어간다).
+_FINGERPRINT_TABLES = frozenset({"corp_codes", "companies", "statement_lines", "metric_values"})
 
 
 def _synchronized(method):
